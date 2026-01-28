@@ -184,18 +184,17 @@ ssh nyx
 clawdbot gateway start
 ```
 
-### Systemd Service
+### Systemd Service (D-Bus Issue)
 
-```bash
-# Enable and start
-sudo systemctl enable clawdbot
-sudo systemctl start clawdbot
-
-# Check status
-sudo systemctl status clawdbot
+The system service works but logs D-Bus warnings:
+```
+Gateway service check failed: Error: systemctl --user unavailable:
+Failed to connect to bus: No medium found
 ```
 
-The service decrypts secrets at startup and runs the gateway automatically.
+**Cause**: When systemd starts as root then switches to `fx` via `sudo -u`, there's no user session bus available.
+
+**Planned fix**: Migrate to a user service (`systemctl --user`) which is cleaner and eliminates the D-Bus warnings.
 
 ## License
 
