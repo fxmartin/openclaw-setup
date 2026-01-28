@@ -29,6 +29,16 @@ I had a similar experience. I initially deployed Nyx on my dev VPS to experiment
 
 For more information, see the [Clawd GitHub repository](https://github.com/moltbot/clawd).
 
+## What Nyx Can Do
+
+See [docs/services-inventory.md](docs/services-inventory.md) for the full list.
+
+**Custom Skills**: analyst reports, banking sector deep-dives, crypto market data, flight tracking, daily briefings, professional profiles, and more.
+
+**Integrations**: Google Workspace, GitHub, email (IMAP), Hetzner Cloud, Dropbox backup.
+
+**Automations**: Daily briefings, Greek lessons, security reports, YouTube channel monitors, calendar reminders.
+
 ## Server Details
 
 See [docs/nyx-server-setup.md](docs/nyx-server-setup.md) for full server specs.
