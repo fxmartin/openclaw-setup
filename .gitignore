@@ -1,1 +1,36 @@
+# Secrets and credentials
 .secrets/
+*.enc
+*.key
+*.pem
+*token*
+*credential*
+*.env
+
+# Nyx workspace directories (should never be committed)
+memory/
+skills/
+briefings/
+canvas/
+output/
+reference/
+scripts/
+.clawdhub/
+.venv/
+
+# Nyx workspace files
+AGENTS.md
+HEARTBEAT.md
+IDENTITY.md
+MEMORY.md
+SOUL.md
+TOOLS.md
+USER.md
+
+# Database files
+*.db
+*.sqlite
+
+# OS files
+.DS_Store
+Thumbs.db
