@@ -184,10 +184,18 @@ ssh nyx
 clawdbot gateway start
 ```
 
-### Systemd Service (Has Issues)
+### Systemd Service
 
-The systemd service exists but has D-Bus issues when running via `sudo -u fx`.
-The bot runs fine when started manually or via user session.
+```bash
+# Enable and start
+sudo systemctl enable clawdbot
+sudo systemctl start clawdbot
+
+# Check status
+sudo systemctl status clawdbot
+```
+
+The service decrypts secrets at startup and runs the gateway automatically.
 
 ## License
 

@@ -15,6 +15,8 @@ Located in `~/clawd/skills/`
 | fx-daily-briefing | Personalized morning digest |
 | humanizer | Remove AI writing patterns |
 | professional-profile | Research individuals' backgrounds |
+| weather | Weather forecasts (built-in) |
+| session-logs | Session logging and history (built-in) |
 
 ## Configured CLIs
 

@@ -73,6 +73,7 @@ sudo SOPS_AGE_KEY_FILE=/root/.config/sops/age/keys.txt \
 ### Re-encrypt after manual changes
 ```bash
 # If you edited the decrypted .json directly:
+# Get your public key from: /root/.config/sops/age/keys.txt (line starting with "public key:")
 AGE_PUB="<AGE_PUBLIC_KEY>"
 sops -e --age $AGE_PUB ~/.clawdbot/clawdbot.json > ~/.clawdbot/clawdbot.json.enc
 ```
@@ -153,6 +154,43 @@ WantedBy=multi-user.target
 
 ### Lost the age private key
 Restore from cloud backup and place at `/root/.config/sops/age/keys.txt` with 600 permissions.
+
+## Recovery
+
+### Full Recovery from Dropbox Backup
+
+```bash
+# 1. Restore age private key
+rclone copy dropbox:nyx-backup/secrets/age/ /tmp/age-restore/
+sudo mkdir -p /root/.config/sops/age
+sudo cp /tmp/age-restore/age-keys-backup.txt /root/.config/sops/age/keys.txt
+sudo chmod 600 /root/.config/sops/age/keys.txt
+sudo chown root:root /root/.config/sops/age/keys.txt
+rm -rf /tmp/age-restore
+
+# 2. Restore encrypted configs
+rclone copy dropbox:nyx-backup/secrets/clawdbot/ ~/.clawdbot/
+chmod 644 ~/.clawdbot/clawdbot.json.enc
+
+# 3. Restore telegram token
+mkdir -p ~/.secrets
+rclone copy dropbox:nyx-backup/secrets/telegram/ ~/.secrets/
+chmod 644 ~/.secrets/telegram-bot-token.enc
+
+# 4. Restart service (will decrypt on startup)
+sudo systemctl restart clawdbot
+```
+
+### Verify Backup Integrity
+
+```bash
+# List backup contents
+rclone ls dropbox:nyx-backup/secrets/
+
+# Test decryption without overwriting
+sudo SOPS_AGE_KEY_FILE=/root/.config/sops/age/keys.txt \
+  sops -d ~/.clawdbot/clawdbot.json.enc | head -5
+```
 
 ### Need to add new secrets
 1. Edit the encrypted file directly:
