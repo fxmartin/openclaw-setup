@@ -1,0 +1,157 @@
+# Nyx Bot Setup
+
+Documentation and configuration for **Nyx**, a Telegram bot powered by [Clawd](https://github.com/moltbot) (formerly MoltBot), running on server Nyx.
+
+## Server Details
+
+See [docs/nyx-server-setup.md](docs/nyx-server-setup.md) for full server specs.
+
+| Property | Value |
+|----------|-------|
+| Hostname | `nyx` |
+| Provider | Hetzner Cloud (CX23) |
+| OS | Ubuntu 24.04.3 LTS |
+| Access | Via Tailscale |
+
+## Bot Access
+
+Nyx is accessible via **Telegram**. The bot token is encrypted and decrypted at startup (see [secrets management](docs/sops-age-setup.md)).
+
+## Installation
+
+### Prerequisites
+
+- Node.js v22.22.0
+- npm 10.9.4
+- SOPS with age encryption
+- Tailscale (for secure access)
+
+### Paths
+
+| Component | Path |
+|-----------|------|
+| Installation | `~/clawd` |
+| Config directory | `~/.clawdbot/` |
+| Binary | `~/.local/share/npm-global/bin/clawdbot` |
+| Systemd service | `/etc/systemd/system/clawdbot.service` |
+| Start script | `/usr/local/bin/clawdbot-start.sh` |
+
+### Version
+
+Clawdbot version: `2026.1.24-3`
+
+## Configuration
+
+### Systemd Service
+
+```ini
+[Unit]
+Description=Clawdbot Gateway
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/clawdbot-start.sh
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+```
+
+### Start Script
+
+The start script (`/usr/local/bin/clawdbot-start.sh`):
+1. Decrypts `clawdbot.json.enc` using SOPS
+2. Decrypts Telegram bot token using age
+3. Runs clawdbot gateway as user `fx`
+
+### Secrets Management
+
+See [docs/sops-age-setup.md](docs/sops-age-setup.md) for full details.
+
+- Config encrypted with SOPS: `~/.clawdbot/clawdbot.json.enc`
+- Telegram token encrypted: `~/.secrets/telegram-bot-token.enc`
+
+## Directory Structure
+
+```
+/home/fx/clawd/
+├── AGENTS.md
+├── HEARTBEAT.md
+├── IDENTITY.md
+├── MEMORY.md
+├── SOUL.md
+├── TOOLS.md
+├── USER.md
+├── assets/
+├── briefings/
+├── canvas/
+├── docs/
+├── memory/
+├── output/
+├── reference/
+├── scripts/
+├── skills/
+└── .venv/
+
+/home/fx/.clawdbot/
+├── agents/
+├── clawdbot.json
+├── clawdbot.json.enc
+├── credentials/
+├── cron/
+├── devices/
+├── identity/
+├── media/
+├── memory/
+├── subagents/
+├── telegram/
+└── workspace/
+```
+
+## Maintenance
+
+### Service Commands
+
+```bash
+# Check status
+sudo systemctl status clawdbot
+
+# View logs
+sudo journalctl -u clawdbot -f
+
+# Restart service
+sudo systemctl restart clawdbot
+
+# Stop service
+sudo systemctl stop clawdbot
+```
+
+### SSH Access
+
+From dev-server (via Tailscale):
+```bash
+ssh nyx
+```
+
+## Running the Bot
+
+### Manual Start (Recommended)
+
+```bash
+# SSH to Nyx
+ssh nyx
+
+# Start the gateway
+clawdbot gateway start
+```
+
+### Systemd Service (Has Issues)
+
+The systemd service exists but has D-Bus issues when running via `sudo -u fx`.
+The bot runs fine when started manually or via user session.
+
+## License
+
+Private deployment documentation.
