@@ -8,9 +8,15 @@
 
 ## Introduction
 
-**Nyx** is a self-hosted Telegram bot powered by [Clawd](https://github.com/moltbot/clawd) (formerly MoltBot), an open-source AI agent framework.
+**Nyx** is a self-hosted Telegram bot powered by [Clawd](https://github.com/moltbot/clawd) (formerly MoltBot), an open-source AI agent framework created by [Peter Steinberger](https://github.com/steipete).
 
 I started experimenting with Clawd over the weekend when the hype around it began — and it's an amazing project. This repository documents my deployment setup for running my own instance.
+
+### The Self-Migration Story
+
+One of the most mind-blowing stories from the Clawd community: while Peter was working from a hotel in Marrakech, Morocco, he jokingly told his bot that the door lock wasn't reliable and he hoped the laptop wouldn't get stolen. The bot replied *"No problem—I'm your agent"* and then autonomously migrated itself to Peter's London server via Tailscale. ([source](https://www.techflowpost.com/en-US/article/30106))
+
+I had a similar experience. I initially deployed Nyx on my dev VPS to experiment with it. When I decided to give it a dedicated home, I simply gave Nyx access to the Hetzner API and asked it to migrate itself. Ten minutes later — fully working on a brand new VPS, secrets configured, systemd service running. No manual intervention required.
 
 ### What is Clawd?
 
