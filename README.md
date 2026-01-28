@@ -30,9 +30,59 @@ For more information, see the [Clawd GitHub repository](https://github.com/clawd
 
 See [docs/services-inventory.md](docs/services-inventory.md) for the full list.
 
-- **Custom Skills:** analyst reports, banking sector deep-dives, crypto market data, flight tracking, daily briefings, professional profiles, and more.
-- **Integrations:** Google Workspace, GitHub, email (IMAP), Hetzner Cloud, Dropbox backup.
-- **Automations:** Daily briefings, Greek lessons, security reports, YouTube channel monitors, calendar reminders.
+### Skills (26 Ready)
+
+**Workspace Skills (13 custom):**
+
+| Skill | Description |
+|-------|-------------|
+| 📊 **analyst-report** | Generate executive analyst reports on companies (PDF) |
+| 🔄 **auto-updater** | Daily auto-update for Clawdbot and skills via cron |
+| 🏦 **banking-sector-report** | Banking sector reports by country (PDF) |
+| 📈 **crypto-market** | Real-time cryptocurrency market data and forecasts |
+| ✈️ **flight-tracker** | Live flight tracking via OpenSky Network |
+| 📰 **fx-daily-briefing** | Morning news digest from newsletters/RSS |
+| ✍️ **humanizer** | Remove AI writing patterns from text |
+| 💼 **linkedin-cli** | LinkedIn CLI (`lk`) for feed, search, messages |
+| 🔮 **perplexity** | AI-powered web search via Perplexity Pro API |
+| 📈 **portfolio-watcher** | Track stock/crypto holdings and alerts |
+| 👤 **professional-profile** | Research professional backgrounds |
+| ⏰ **remind-me** | Natural language reminders via cron |
+| 🧶 **skillcraft** | Create and package Clawdbot skills |
+
+**Bundled Skills (13 ready):**
+
+| Skill | Description |
+|-------|-------------|
+| 📦 **clawdhub** | Install/update skills from ClawdHub |
+| 📦 **github** | GitHub CLI (`gh`) integration |
+| 🎮 **gog** | Google Workspace (Gmail, Calendar, Drive) |
+| 📧 **himalaya** | Email via IMAP/SMTP |
+| 🍌 **nano-banana-pro** | Gemini image generation |
+| 📝 **notion** | Notion API integration |
+| 🖼️ **openai-image-gen** | OpenAI image generation |
+| ☁️ **openai-whisper-api** | Audio transcription |
+| 📜 **session-logs** | Search session history |
+| 📦 **slack** | Slack integration |
+| 🧵 **tmux** | Tmux session control |
+| 🎞️ **video-frames** | Extract video frames (ffmpeg) |
+| 🌤️ **weather** | Weather forecasts |
+
+### Integrations
+
+- **Telegram** - Primary messaging channel
+- **LinkedIn** - Cookie-based CLI access (`lk whoami`, `lk feed`, `lk search`)
+- **Perplexity Pro** - AI web search with citations
+- **Google Workspace** - Gmail, Calendar, Drive
+- **GitHub** - CLI access via `gh`
+- **Hetzner Cloud** - Server management
+- **Dropbox** - Backup
+
+### Automations
+
+- **Daily Auto-Update** - 4:00 AM CET (updates Clawdbot + skills)
+- **Birthday Reminders** - 40 contacts configured (annual + 1-week advance)
+- **Daily Briefings** - Morning news digest
 
 ## Server Details
 
