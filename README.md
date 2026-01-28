@@ -65,8 +65,9 @@ Nyx is accessible via Telegram. The bot token is encrypted and decrypted at star
 | Installation | ~/clawd |
 | Config directory | ~/.clawdbot/ |
 | Binary | ~/.local/share/npm-global/bin/clawdbot |
-| User service | ~/.config/systemd/user/clawdbot.service |
-| Decrypt script | /usr/local/bin/clawdbot-decrypt.sh |
+| System service | /etc/systemd/system/clawdbot.service |
+| Tmpfs mount unit | /etc/systemd/system/home-fx-.clawdbot-runtime.mount |
+| Start script | /usr/local/bin/clawdbot-start.sh |
 
 ### Version
 
@@ -74,60 +75,53 @@ Clawdbot version: 2026.1.24-3
 
 ## Configuration
 
-### User Service (systemd)
-
-Clawdbot runs as a **user service** with lingering enabled, which provides:
-- Proper D-Bus session access
-- Clean systemctl --user integration
-- No privilege escalation issues
+### Systemd Service
 
 ```ini
-# ~/.config/systemd/user/clawdbot.service
+# /etc/systemd/system/clawdbot.service
 [Unit]
 Description=Clawdbot Gateway
-After=network-online.target
-Wants=network-online.target
+After=network.target home-fx-.clawdbot-runtime.mount
+Requires=home-fx-.clawdbot-runtime.mount
 
 [Service]
 Type=simple
-ExecStartPre=/usr/local/bin/clawdbot-decrypt.sh
-ExecStart=/home/fx/.local/share/npm-global/bin/clawdbot gateway start
+Environment="XDG_RUNTIME_DIR=/run/user/1000"
+Environment="DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus"
+ExecStart=/usr/local/bin/clawdbot-start.sh
 Restart=always
 RestartSec=5
-Environment=PATH=/home/fx/.local/share/npm-global/bin:/home/fx/.local/bin:/usr/local/bin:/usr/bin:/bin
 
 [Install]
-WantedBy=default.target
+WantedBy=multi-user.target
 ```
 
-### Decrypt Script
+### Start Script
 
-The decrypt script (`/usr/local/bin/clawdbot-decrypt.sh`) uses sudo with NOPASSWD for specific decrypt commands:
+The start script (`/usr/local/bin/clawdbot-start.sh`):
+1. Mounts tmpfs at `~/.clawdbot/runtime/` if not already mounted
+2. Decrypts `clawdbot.json.enc` using SOPS → writes to tmpfs (RAM)
+3. Decrypts Telegram bot token using age → writes to tmpfs (RAM)
+4. Creates symlinks from original paths to tmpfs locations
+5. Runs clawdbot gateway as user `fx`
 
-```bash
-#!/bin/bash
-set -e
-
-CONFIG_DIR=/home/fx/.clawdbot
-SECRETS_DIR=/home/fx/.secrets
-
-# Decrypt clawdbot.json (requires sudo)
-if [ -f "$CONFIG_DIR/clawdbot.json.enc" ]; then
-  sudo /usr/local/bin/sops-decrypt-config
-fi
-
-# Decrypt telegram token (requires sudo)
-if [ -f "$SECRETS_DIR/telegram-bot-token.enc" ]; then
-  sudo /usr/local/bin/age-decrypt-token
-fi
-```
-
-### Secrets Management
+### Secrets Management (tmpfs + SOPS/AGE)
 
 See [docs/sops-age-setup.md](docs/sops-age-setup.md) for full details.
 
-- Config encrypted with SOPS: `~/.clawdbot/clawdbot.json.enc`
-- Telegram token encrypted: `~/.secrets/telegram-bot-token.enc`
+**Encrypted sources (on disk):**
+- `~/.clawdbot/clawdbot.json.enc` - SOPS encrypted config
+- `~/.secrets/telegram-bot-token.enc` - AGE encrypted token
+
+**Decrypted at runtime (in RAM only):**
+- `~/.clawdbot/runtime/clawdbot.json` - tmpfs mount
+- `~/.clawdbot/runtime/telegram-bot-token` - tmpfs mount
+
+**Symlinks (for compatibility):**
+- `~/.clawdbot/clawdbot.json` → `runtime/clawdbot.json`
+- `~/.secrets/telegram-bot-token` → `~/.clawdbot/runtime/telegram-bot-token`
+
+This ensures secrets are **never written to disk** after decryption and are automatically wiped on reboot.
 
 ## Directory Structure
 
@@ -153,14 +147,17 @@ See [docs/sops-age-setup.md](docs/sops-age-setup.md) for full details.
 
 /home/fx/.clawdbot/
 ├── agents/
-├── clawdbot.json
-├── clawdbot.json.enc
+├── clawdbot.json → runtime/clawdbot.json (symlink)
+├── clawdbot.json.enc (encrypted source)
 ├── credentials/
 ├── cron/
 ├── devices/
 ├── identity/
 ├── media/
 ├── memory/
+├── runtime/ (tmpfs - RAM only)
+│   ├── clawdbot.json (decrypted)
+│   └── telegram-bot-token (decrypted)
 ├── subagents/
 ├── telegram/
 └── workspace/
@@ -172,16 +169,16 @@ See [docs/sops-age-setup.md](docs/sops-age-setup.md) for full details.
 
 ```bash
 # Check status
-systemctl --user status clawdbot-gateway.service
+sudo systemctl status clawdbot
 
 # View logs
-journalctl --user -u clawdbot-gateway -f
+sudo journalctl -u clawdbot -f
 
 # Restart service
-systemctl --user restart clawdbot.service
+sudo systemctl restart clawdbot
 
 # Stop service
-systemctl --user stop clawdbot-gateway.service
+sudo systemctl stop clawdbot
 ```
 
 ### SSH Access
@@ -194,13 +191,103 @@ ssh nyx
 ## Architecture
 
 ```
-Boot → loginctl linger (fx) → user session starts
+Boot → systemd starts tmpfs mount → clawdbot.service starts
                 ↓
-    clawdbot-decrypt.sh (sudo for age/sops keys)
+    clawdbot-start.sh (decrypts to tmpfs as root)
                 ↓
-    clawdbot gateway start
+    Secrets in RAM only (symlinked to original paths)
                 ↓
-    clawdbot-gateway.service (user-managed, proper D-Bus)
+    clawdbot gateway start (as user fx)
+```
+
+The service runs without D-Bus warnings thanks to:
+1. `XDG_RUNTIME_DIR` and `DBUS_SESSION_BUS_ADDRESS` environment variables
+2. User lingering enabled: `loginctl enable-linger fx`
+
+## Security
+
+### Security Audit (2026-01-28)
+
+A comprehensive security audit was performed on the Nyx server. See below for findings and mitigations.
+
+#### Security Stack
+
+| Component | Status | Details |
+|-----------|--------|---------|
+| **Firewall** | UFW active | Default deny, only SSH (22) + Tailscale (41641) |
+| **SSH Hardening** | Keys only | `PermitRootLogin no`, `PasswordAuthentication no`, `AllowUsers fx`, `MaxAuthTries 3` |
+| **Intrusion Prevention** | Fail2ban | 92+ total bans, active monitoring |
+| **Rootkit Detection** | rkhunter | Weekly scans via cron |
+| **Auto Updates** | Enabled | Unattended security upgrades |
+| **Secrets at Rest** | SOPS/AGE | AES256-GCM encryption |
+| **Secrets in Memory** | tmpfs | Decrypted secrets in RAM only |
+
+#### Kernel Hardening
+
+```
+kernel.randomize_va_space = 2      # ASLR enabled
+fs.protected_hardlinks = 1         # Hardlink protection
+fs.protected_symlinks = 1          # Symlink protection
+net.ipv4.tcp_syncookies = 1        # SYN flood protection
+net.ipv4.icmp_echo_ignore_broadcasts = 1
+net.ipv4.conf.all.accept_source_route = 0
+```
+
+#### tmpfs Implementation (Defense in Depth)
+
+Implemented RAM-only storage for decrypted secrets:
+
+```
+BEFORE: sops decrypt → disk file → clawdbot reads → file persists on disk
+                                                    ↓
+                                          Recoverable via disk forensics
+
+AFTER:  sops decrypt → tmpfs (RAM) → symlink → clawdbot reads
+                          ↓
+                    Reboot = secrets wiped
+                    No disk forensics possible
+```
+
+**Systemd mount unit** (`/etc/systemd/system/home-fx-.clawdbot-runtime.mount`):
+```ini
+[Unit]
+Description=Clawdbot Runtime Secrets (tmpfs)
+Before=clawdbot.service
+
+[Mount]
+What=tmpfs
+Where=/home/fx/.clawdbot/runtime
+Type=tmpfs
+Options=nodev,nosuid,noexec,size=2M,uid=1000,gid=1000,mode=0700
+
+[Install]
+WantedBy=multi-user.target
+```
+
+#### Network Exposure
+
+- **Public internet**: Only SSH (protected by Fail2ban)
+- **Tailscale**: Primary access method
+- **Clawdbot ports**: Bound to localhost only (127.0.0.1:18789, 18791, 18792)
+- **SMTP**: Port 25 explicitly blocked
+
+### Verification Commands
+
+```bash
+# Check tmpfs mount
+mount | grep runtime
+
+# Verify symlinks
+ls -la ~/.clawdbot/clawdbot.json ~/.secrets/telegram-bot-token
+
+# Check no plaintext on disk
+find ~/.clawdbot -maxdepth 1 -name '*.json' -type f
+
+# Check fail2ban status
+sudo fail2ban-client status sshd
+
+# Check UFW rules
+sudo ufw status verbose
 ```
 
 ## License
