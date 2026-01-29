@@ -8,7 +8,7 @@
 | Setting | Value |
 |---------|-------|
 | **Provider** | Hetzner Cloud |
-| **Type** | CX23 (2 vCPU, 4GB RAM, 40GB SSD) |
+| **Type** | CX22 (2 vCPU, 4GB RAM, 40GB SSD) |
 | **Location** | Nuremberg, Germany (nbg1) |
 | **OS** | Ubuntu 24.04.3 LTS |
 | **Cost** | €3.50/month |

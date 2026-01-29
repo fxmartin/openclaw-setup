@@ -91,7 +91,7 @@ See [docs/nyx-server-setup.md](docs/nyx-server-setup.md) for full server specs.
 | Property | Value |
 |----------|-------|
 | Hostname | nyx |
-| Provider | Hetzner Cloud (CX23) |
+| Provider | Hetzner Cloud (CX22) |
 | OS | Ubuntu 24.04.3 LTS |
 | Access | Via Tailscale |
 
