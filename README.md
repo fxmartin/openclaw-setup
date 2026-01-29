@@ -340,6 +340,152 @@ sudo fail2ban-client status sshd
 sudo ufw status verbose
 ```
 
+## Automated Provisioning
+
+This repository includes automated provisioning scripts for disaster recovery and new server setup.
+
+### Prerequisites
+
+- `hcloud` CLI installed and authenticated (for new server creation)
+- Secrets bundle file from 1Password
+- SSH key configured in Hetzner Cloud
+
+### Quick Start (Disaster Recovery)
+
+```bash
+# 1. Download secrets bundle from 1Password
+# 2. Run provisioning
+./provision/nyx-provision.sh --secrets-bundle ./nyx-secrets-bundle.tar.gz.age
+
+# 3. Enter passphrase when prompted
+# 4. Wait ~15 minutes
+# 5. Verify: ./provision/nyx-verify.sh --remote nyx
+```
+
+### Secrets Bundle
+
+All secrets are stored in a single AGE-encrypted tarball:
+
+```
+nyx-secrets-bundle/
+├── manifest.json               # Metadata + SHA256 checksums
+├── age/
+│   └── keys.txt                # AGE private key (master key)
+├── sops/
+│   └── clawdbot.json.enc       # SOPS-encrypted config
+├── secrets/
+│   └── telegram-bot-token.enc  # AGE-encrypted token
+├── credentials/
+│   ├── gh-hosts.yml.enc        # GitHub CLI config
+│   └── rclone.conf.enc         # Dropbox config
+└── sops-config/
+    └── .sops.yaml              # SOPS configuration
+```
+
+### Export Secrets (from local machine)
+
+```bash
+# Run from local machine - SSHs to Nyx, collects secrets, encrypts locally
+./provision/nyx-export-bundle.sh
+
+# Or with specific output path
+./provision/nyx-export-bundle.sh --output ~/backups/nyx-secrets.tar.gz.age
+
+# Dry run to see what would be exported
+./provision/nyx-export-bundle.sh --dry-run
+```
+
+The script will:
+1. SSH to Nyx
+2. Collect all secrets (AGE key, configs, credentials)
+3. Copy tarball back locally
+4. Encrypt with AGE passphrase (auto-generated or specified)
+5. Verify the bundle can be decrypted
+6. Display passphrase for 1Password storage
+
+### Import Secrets (to new server)
+
+```bash
+sudo ./provision/nyx-import-secrets.sh --bundle /tmp/bundle.tar.gz.age
+```
+
+### Provisioning Phases
+
+| Phase | Description |
+|-------|-------------|
+| 1. Hetzner Setup | Create CX22 server (Ubuntu 24.04, nbg1) |
+| 2. Base Config | Create fx user, SSH keys, hostname |
+| 3. Security | UFW, Fail2ban, SSH hardening, rkhunter |
+| 4. Secrets | Upload & import secrets bundle |
+| 5. Software | Node.js 22, clawdbot, sops, age, gh, rclone |
+| 6. Service | Systemd service, tmpfs mount, decrypt scripts |
+| 7. Workspace | Restore ~/clawd/ from Dropbox |
+| 8. Tailscale | Install & connect |
+
+### Verification
+
+```bash
+# Run verification locally
+./provision/nyx-verify.sh
+
+# Run against remote server
+./provision/nyx-verify.sh --remote nyx
+
+# Full DR test
+# 1. Export secrets from current server
+# 2. Delete server
+# 3. Run provisioning with bundle
+# 4. Verify Telegram bot responds
+```
+
+### Provisioning Scripts
+
+| Script | Purpose |
+|--------|---------|
+| `provision/nyx-export-bundle.sh` | **Export from local** - SSH to Nyx, create encrypted bundle |
+| `provision/nyx-provision.sh` | Main provisioning orchestrator |
+| `provision/nyx-export-secrets.sh` | Export secrets (run on Nyx) |
+| `provision/nyx-import-secrets.sh` | Import secrets bundle |
+| `provision/nyx-verify.sh` | Post-install verification |
+| `security/setup-security.sh` | Install security stack |
+| `tests/test-bundle-roundtrip.sh` | Test export/import cycle |
+
+### Repository Structure
+
+```
+moltbot-setup/
+├── provision/
+│   ├── nyx-export-bundle.sh       # Export from local (recommended)
+│   ├── nyx-provision.sh           # Main entry point
+│   ├── nyx-export-secrets.sh      # Export (run on Nyx)
+│   ├── nyx-import-secrets.sh      # Import bundle
+│   ├── nyx-verify.sh              # Verification
+│   └── lib/
+│       └── logging.sh             # Logging utilities
+├── config/
+│   ├── clawdbot.service           # Systemd service
+│   ├── clawdbot-runtime.mount     # tmpfs mount unit
+│   ├── clawdbot-start.sh          # Start script
+│   ├── clawdbot-decrypt.sh        # Decrypt wrapper
+│   ├── sops-decrypt-config        # SOPS helper
+│   ├── age-decrypt-token          # AGE helper
+│   └── sudoers.d/
+│       └── clawdbot-decrypt       # NOPASSWD rules
+├── security/
+│   ├── setup-security.sh          # Security installer
+│   ├── ufw-setup.sh               # Firewall setup
+│   ├── fail2ban-jail.local        # Fail2ban rules
+│   └── sshd-hardening.conf        # SSH config
+├── tests/
+│   └── test-bundle-roundtrip.sh   # Bundle test
+├── docs/
+│   ├── nyx-server-setup.md        # Server specs
+│   ├── sops-age-setup.md          # Secrets management
+│   └── services-inventory.md      # Skills inventory
+└── assets/
+    └── images/
+```
+
 ## License
 
 Private deployment documentation.

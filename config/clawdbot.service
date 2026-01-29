@@ -1,0 +1,33 @@
+# Clawdbot Gateway System Service
+# Install to: /etc/systemd/system/clawdbot.service
+#
+# Dependencies:
+#   - home-fx-.clawdbot-runtime.mount (tmpfs for secrets)
+#   - /usr/local/bin/clawdbot-start.sh (decrypt and start wrapper)
+#
+# Usage:
+#   sudo systemctl enable clawdbot
+#   sudo systemctl start clawdbot
+#   sudo journalctl -u clawdbot -f
+
+[Unit]
+Description=Clawdbot Gateway
+After=network.target home-fx-.clawdbot-runtime.mount
+Requires=home-fx-.clawdbot-runtime.mount
+
+[Service]
+Type=simple
+Environment="XDG_RUNTIME_DIR=/run/user/1000"
+Environment="DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus"
+ExecStart=/usr/local/bin/clawdbot-start.sh
+Restart=always
+RestartSec=5
+# Security hardening
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/home/fx/.clawdbot /home/fx/clawd
+PrivateTmp=true
+NoNewPrivileges=false
+
+[Install]
+WantedBy=multi-user.target

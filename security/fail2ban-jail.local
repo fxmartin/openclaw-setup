@@ -1,0 +1,72 @@
+# Fail2ban jail configuration for Nyx server
+# Install to: /etc/fail2ban/jail.local
+#
+# Features:
+#   - SSH brute-force protection (3 attempts = 24h ban)
+#   - Recidive jail for repeat offenders (permanent ban after multiple violations)
+#   - Aggressive settings suitable for personal server
+#
+# Commands:
+#   sudo systemctl restart fail2ban
+#   sudo fail2ban-client status sshd
+#   sudo fail2ban-client status recidive
+#   sudo fail2ban-client unban <ip>
+
+[DEFAULT]
+# Default ban duration: 24 hours
+bantime = 86400
+
+# Window to count failures: 10 minutes
+findtime = 600
+
+# Max failures before ban
+maxretry = 3
+
+# Email alerts (uncomment and configure if desired)
+# destemail = admin@example.com
+# sendername = Fail2Ban-Nyx
+# mta = sendmail
+# action = %(action_mwl)s
+
+# Use iptables for blocking
+banaction = iptables-multiport
+banaction_allports = iptables-allports
+
+# Whitelist Tailscale subnet (100.64.0.0/10)
+ignoreip = 127.0.0.1/8 ::1 100.64.0.0/10
+
+
+[sshd]
+enabled = true
+port = ssh
+filter = sshd
+logpath = /var/log/auth.log
+backend = systemd
+
+# Strict settings for SSH
+maxretry = 3
+findtime = 300
+bantime = 86400
+
+
+[sshd-aggressive]
+# Extra aggressive mode for SSH
+enabled = true
+port = ssh
+filter = sshd[mode=aggressive]
+logpath = /var/log/auth.log
+backend = systemd
+maxretry = 2
+findtime = 600
+bantime = 172800
+
+
+[recidive]
+# Jail for repeat offenders (ban escalation)
+enabled = true
+filter = recidive
+logpath = /var/log/fail2ban.log
+action = iptables-allports[name=recidive, protocol=all]
+bantime = 604800
+findtime = 86400
+maxretry = 3

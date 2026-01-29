@@ -1,0 +1,28 @@
+#!/bin/bash
+# sops-decrypt-config - SOPS decrypt helper for clawdbot.json.enc
+# Install to: /usr/local/bin/sops-decrypt-config (root:root 755)
+#
+# Decrypts clawdbot.json.enc using SOPS with AGE encryption.
+# Output is owned by fx user with 600 permissions.
+#
+# Called via sudo from clawdbot-decrypt.sh
+
+set -e
+
+CONFIG_DIR=/home/fx/.clawdbot
+AGE_KEY=/root/.config/sops/age/keys.txt
+OUTPUT="$CONFIG_DIR/clawdbot.json"
+INPUT="$CONFIG_DIR/clawdbot.json.enc"
+
+# Verify prerequisites
+[[ -f "$AGE_KEY" ]] || { echo "ERROR: AGE key not found: $AGE_KEY" >&2; exit 1; }
+[[ -f "$INPUT" ]] || { echo "ERROR: Encrypted config not found: $INPUT" >&2; exit 1; }
+
+# Decrypt
+SOPS_AGE_KEY_FILE="$AGE_KEY" sops -d --output-type json "$INPUT" > "$OUTPUT"
+
+# Set ownership and permissions
+chown fx:fx "$OUTPUT"
+chmod 600 "$OUTPUT"
+
+echo "Decrypted: $INPUT -> $OUTPUT"

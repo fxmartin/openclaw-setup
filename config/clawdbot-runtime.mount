@@ -1,0 +1,23 @@
+# Clawdbot Runtime tmpfs Mount Unit
+# Install to: /etc/systemd/system/home-fx-.clawdbot-runtime.mount
+#
+# This creates a tmpfs (RAM-based) filesystem for decrypted secrets.
+# Secrets are NEVER written to disk and are wiped on reboot.
+#
+# Security benefits:
+#   - Secrets exist only in RAM
+#   - No disk forensics possible
+#   - Automatic cleanup on reboot/power loss
+
+[Unit]
+Description=Clawdbot Runtime Secrets (tmpfs)
+Before=clawdbot.service
+
+[Mount]
+What=tmpfs
+Where=/home/fx/.clawdbot/runtime
+Type=tmpfs
+Options=nodev,nosuid,noexec,size=2M,uid=1000,gid=1000,mode=0700
+
+[Install]
+WantedBy=multi-user.target

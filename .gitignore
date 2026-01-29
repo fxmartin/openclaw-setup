@@ -7,6 +7,10 @@
 *credential*
 *.env
 
+# Encrypted secrets bundles (NEVER commit)
+*.age
+*secrets-bundle*
+
 # Nyx workspace directories (should never be committed)
 memory/
 skills/
