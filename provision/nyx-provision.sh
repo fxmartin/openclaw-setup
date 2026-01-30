@@ -51,6 +51,9 @@ SKIP_SOFTWARE=0
 SKIP_WORKSPACE=0
 SKIP_TAILSCALE=0
 
+# Workspace restore source: "dropbox" (default), "nas", or "fresh" (none)
+RESTORE_SOURCE="dropbox"
+
 # ============================================
 # Usage
 # ============================================
@@ -72,16 +75,24 @@ OPTIONS:
     --update-ssh-config NAME    Update SSH config with Tailscale IP for server NAME
     --skip-secrets              Skip secrets import
     --skip-software             Skip software installation
-    --skip-workspace            Skip Dropbox workspace restore
+    --skip-workspace            Skip workspace restore (same as --fresh)
     --skip-tailscale            Skip Tailscale setup
+    --fresh                     Brand new bot: skip workspace restore entirely
+    --restore-from-nas          Clone existing bot: restore workspace from NAS backup
     -h, --help                  Show this help message
 
 EXAMPLES:
-    # Full provisioning (create new server)
+    # Clone existing bot (restore from NAS - recommended for DR)
+    ./nyx-provision.sh --secrets-bundle ~/bundle.tar.gz.age --restore-from-nas
+
+    # Brand new bot (fresh installation, no workspace restore)
+    ./nyx-provision.sh --secrets-bundle ~/bundle.tar.gz.age --fresh
+
+    # Default: restore from Dropbox
     ./nyx-provision.sh --secrets-bundle ~/nyx-secrets-bundle.tar.gz.age
 
-    # Provision existing server
-    ./nyx-provision.sh --existing-server nyx.example.com --secrets-bundle ~/bundle.tar.gz.age
+    # Provision existing server with NAS restore
+    ./nyx-provision.sh --existing-server nyx.example.com --secrets-bundle ~/bundle.tar.gz.age --restore-from-nas
 
     # Create server with custom name
     ./nyx-provision.sh --secrets-bundle ~/bundle.tar.gz.age --server-name nyx-prod
@@ -138,6 +149,16 @@ parse_args() {
                 ;;
             --skip-workspace)
                 SKIP_WORKSPACE=1
+                RESTORE_SOURCE="fresh"
+                shift
+                ;;
+            --fresh)
+                SKIP_WORKSPACE=1
+                RESTORE_SOURCE="fresh"
+                shift
+                ;;
+            --restore-from-nas)
+                RESTORE_SOURCE="nas"
                 shift
                 ;;
             --skip-tailscale)
@@ -696,15 +717,33 @@ SCRIPT
 # ============================================
 
 restore_workspace() {
-    if [[ $SKIP_WORKSPACE -eq 1 ]]; then
-        log_step "Skipping workspace restore"
+    if [[ $SKIP_WORKSPACE -eq 1 ]] || [[ "$RESTORE_SOURCE" == "fresh" ]]; then
+        log_step "Skipping workspace restore (fresh installation)"
+        remote_exec "bash -s" <<'SCRIPT'
+TARGET_USER="fx"
+TARGET_HOME="/home/$TARGET_USER"
+echo "Creating empty workspace directories..."
+mkdir -p "$TARGET_HOME/clawd"
+mkdir -p "$TARGET_HOME/.openclaw"
+chown -R "$TARGET_USER:$TARGET_USER" "$TARGET_HOME/clawd" "$TARGET_HOME/.openclaw"
+echo "Fresh workspace created"
+SCRIPT
+        log_success "Fresh workspace created"
         return 0
     fi
 
+    if [[ "$RESTORE_SOURCE" == "nas" ]]; then
+        restore_workspace_from_nas
+    else
+        restore_workspace_from_dropbox
+    fi
+}
+
+restore_workspace_from_dropbox() {
     log_step "Restoring workspace from Dropbox"
 
     if [[ $DRY_RUN -eq 1 ]]; then
-        log_info "[DRY-RUN] Would restore ~/clawd/ from Dropbox backup"
+        log_info "[DRY-RUN] Would restore ~/clawd/ and ~/.openclaw/ from Dropbox backup"
         return 0
     fi
 
@@ -737,13 +776,95 @@ if ! su - "$TARGET_USER" -c "rclone lsf dropbox:nyx-backup/clawd/" &>/dev/null; 
     exit 0
 fi
 
-echo "==> Restoring workspace from Dropbox..."
+echo "==> Restoring clawd workspace from Dropbox..."
 su - "$TARGET_USER" -c "rclone sync dropbox:nyx-backup/clawd/ ~/clawd/ --progress"
 
-echo "Workspace restored"
+echo "==> Restoring openclaw config from Dropbox..."
+if su - "$TARGET_USER" -c "rclone lsf dropbox:nyx-backup/openclaw/" &>/dev/null; then
+    su - "$TARGET_USER" -c "rclone sync dropbox:nyx-backup/openclaw/ ~/.openclaw/ --progress --exclude 'runtime/**'"
+else
+    echo "WARN: No openclaw backup found at dropbox:nyx-backup/openclaw/"
+fi
+
+echo "Workspace restored from Dropbox"
 SCRIPT
 
-    log_success "Workspace restore complete"
+    log_success "Workspace restore from Dropbox complete"
+}
+
+restore_workspace_from_nas() {
+    log_step "Restoring workspace from NAS (clone mode)"
+
+    if [[ $DRY_RUN -eq 1 ]]; then
+        log_info "[DRY-RUN] Would restore ~/clawd/ and ~/.openclaw/ from NAS backup"
+        return 0
+    fi
+
+    # Copy restore script to server
+    log_substep "Uploading NAS restore script"
+    remote_copy "${REPO_DIR}/scripts/restore-from-nas.sh" "/tmp/nyx-setup/"
+
+    # Check NAS prerequisites
+    log_substep "Checking NAS connectivity prerequisites"
+    remote_exec "bash -s" <<'SCRIPT'
+set -e
+
+TARGET_USER="fx"
+TARGET_HOME="/home/$TARGET_USER"
+RSYNC_PASSWORD_FILE="$TARGET_HOME/.rsync-nas-password"
+RSYNC_HOST="100.98.9.111"
+
+# Check if rsync password file exists
+if [[ ! -f "$RSYNC_PASSWORD_FILE" ]]; then
+    echo ""
+    echo "ERROR: Rsync password file not found: $RSYNC_PASSWORD_FILE"
+    echo ""
+    echo "To set up NAS restore, create the password file:"
+    echo "  echo 'YOUR_RSYNC_PASSWORD' > $RSYNC_PASSWORD_FILE"
+    echo "  chmod 600 $RSYNC_PASSWORD_FILE"
+    echo ""
+    exit 1
+fi
+
+# Check NAS reachability via Tailscale
+echo "Checking NAS reachability at $RSYNC_HOST:873..."
+if ! nc -z -w5 "$RSYNC_HOST" 873 2>/dev/null; then
+    echo ""
+    echo "ERROR: Cannot reach NAS rsync port via Tailscale"
+    echo ""
+    echo "Ensure:"
+    echo "  1. Tailscale is connected: tailscale status"
+    echo "  2. NAS is online at $RSYNC_HOST"
+    echo "  3. Rsync daemon is running on NAS port 873"
+    echo ""
+    exit 1
+fi
+
+echo "NAS is reachable"
+SCRIPT
+
+    # Run restore
+    log_substep "Restoring workspace from NAS"
+    remote_exec "bash -s" <<'SCRIPT'
+set -e
+
+TARGET_USER="fx"
+TARGET_HOME="/home/$TARGET_USER"
+RESTORE_SCRIPT="/tmp/nyx-setup/restore-from-nas.sh"
+
+# Install restore script for future use
+cp "$RESTORE_SCRIPT" "${TARGET_HOME}/restore-from-nas.sh"
+chmod 755 "${TARGET_HOME}/restore-from-nas.sh"
+chown "${TARGET_USER}:${TARGET_USER}" "${TARGET_HOME}/restore-from-nas.sh"
+
+# Run restore with --force (non-interactive)
+echo "==> Running NAS restore..."
+su - "$TARGET_USER" -c "bash $RESTORE_SCRIPT --force"
+
+echo "Workspace restored from NAS"
+SCRIPT
+
+    log_success "Workspace restore from NAS complete"
 }
 
 # ============================================
@@ -806,9 +927,10 @@ setup_backups() {
     fi
 
     # Copy all backup scripts
-    log_substep "Uploading backup and security scripts"
+    log_substep "Uploading backup, restore, and security scripts"
     remote_copy "${REPO_DIR}/scripts/backup-to-dropbox.sh" "/tmp/nyx-setup/"
     remote_copy "${REPO_DIR}/scripts/backup-to-nas.sh" "/tmp/nyx-setup/"
+    remote_copy "${REPO_DIR}/scripts/restore-from-nas.sh" "/tmp/nyx-setup/"
     remote_copy "${REPO_DIR}/scripts/security-scan.sh" "/tmp/nyx-setup/"
 
     remote_exec "bash -s" <<'SCRIPT'
@@ -841,6 +963,14 @@ if [[ -f "/tmp/nyx-setup/security-scan.sh" ]]; then
     chmod 755 "${TARGET_HOME}/security-scan.sh"
     chown "${TARGET_USER}:${TARGET_USER}" "${TARGET_HOME}/security-scan.sh"
     echo "Installed: ${TARGET_HOME}/security-scan.sh"
+fi
+
+# Install NAS restore script (for disaster recovery)
+if [[ -f "/tmp/nyx-setup/restore-from-nas.sh" ]]; then
+    cp "/tmp/nyx-setup/restore-from-nas.sh" "${TARGET_HOME}/restore-from-nas.sh"
+    chmod 755 "${TARGET_HOME}/restore-from-nas.sh"
+    chown "${TARGET_USER}:${TARGET_USER}" "${TARGET_HOME}/restore-from-nas.sh"
+    echo "Installed: ${TARGET_HOME}/restore-from-nas.sh"
 fi
 
 echo "==> Checking prerequisites..."
@@ -1105,6 +1235,7 @@ main() {
     log_info "Server name: $SERVER_NAME"
     log_info "Server type: $SERVER_TYPE"
     log_info "Location: $SERVER_LOCATION"
+    log_info "Workspace restore: $RESTORE_SOURCE"
     [[ -n "$SECRETS_BUNDLE" ]] && log_info "Secrets bundle: $SECRETS_BUNDLE"
     [[ -n "$EXISTING_SERVER" ]] && log_info "Existing server: $EXISTING_SERVER"
 
