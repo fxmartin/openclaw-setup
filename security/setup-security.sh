@@ -13,6 +13,16 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
+# Parse arguments
+SKIP_SSH_HARDENING=0
+for arg in "$@"; do
+    case $arg in
+        --skip-ssh-hardening)
+            SKIP_SSH_HARDENING=1
+            ;;
+    esac
+done
+
 # Colors
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -100,27 +110,32 @@ fail2ban-client status sshd 2>/dev/null || log_warn "Fail2ban sshd jail not yet 
 # ============================================
 # SSH Hardening
 # ============================================
-log_step "Hardening SSH"
-
-SSH_CONFIG_DIR="/etc/ssh/sshd_config.d"
-mkdir -p "$SSH_CONFIG_DIR"
-
-if [[ -f "${SCRIPT_DIR}/sshd-hardening.conf" ]]; then
-    cp "${SCRIPT_DIR}/sshd-hardening.conf" "${SSH_CONFIG_DIR}/99-hardening.conf"
-    log_info "Installed SSH hardening configuration"
-
-    # Test configuration
-    if sshd -t; then
-        log_info "SSH configuration valid"
-        systemctl restart sshd
-        log_info "SSH service restarted"
-    else
-        log_error "SSH configuration test failed!"
-        rm -f "${SSH_CONFIG_DIR}/99-hardening.conf"
-        log_warn "Removed invalid configuration"
-    fi
+if [[ $SKIP_SSH_HARDENING -eq 1 ]]; then
+    log_step "Skipping SSH hardening (--skip-ssh-hardening)"
+    log_info "SSH hardening will be applied later after user setup is complete"
 else
-    log_warn "SSH hardening config not found: ${SCRIPT_DIR}/sshd-hardening.conf"
+    log_step "Hardening SSH"
+
+    SSH_CONFIG_DIR="/etc/ssh/sshd_config.d"
+    mkdir -p "$SSH_CONFIG_DIR"
+
+    if [[ -f "${SCRIPT_DIR}/sshd-hardening.conf" ]]; then
+        cp "${SCRIPT_DIR}/sshd-hardening.conf" "${SSH_CONFIG_DIR}/99-hardening.conf"
+        log_info "Installed SSH hardening configuration"
+
+        # Test configuration
+        if sshd -t; then
+            log_info "SSH configuration valid"
+            systemctl restart ssh  # Ubuntu 24.04 uses 'ssh' not 'sshd'
+            log_info "SSH service restarted"
+        else
+            log_error "SSH configuration test failed!"
+            rm -f "${SSH_CONFIG_DIR}/99-hardening.conf"
+            log_warn "Removed invalid configuration"
+        fi
+    else
+        log_warn "SSH hardening config not found: ${SCRIPT_DIR}/sshd-hardening.conf"
+    fi
 fi
 
 # ============================================

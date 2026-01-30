@@ -23,10 +23,10 @@ source "${SCRIPT_DIR}/lib/logging.sh"
 
 # Server settings
 SERVER_NAME="nyx"
-SERVER_TYPE="cx22"
+SERVER_TYPE="cpx22"
 SERVER_IMAGE="ubuntu-24.04"
 SERVER_LOCATION="nbg1"
-SSH_KEY_NAME="default"
+SSH_KEY_NAME=""  # Set dynamically by create_ssh_key()
 
 # Target user
 TARGET_USER="fx"
@@ -40,6 +40,9 @@ EXISTING_SERVER=""
 
 # Dry run mode
 DRY_RUN=0
+
+# Update SSH config only mode
+UPDATE_SSH_CONFIG_ONLY=""
 
 # Skip specific phases
 SKIP_HETZNER=0
@@ -59,13 +62,14 @@ Usage: $(basename "$0") [OPTIONS]
 Provision a new Nyx server on Hetzner Cloud.
 
 OPTIONS:
-    -b, --secrets-bundle FILE   Secrets bundle file (required)
+    -b, --secrets-bundle FILE   Secrets bundle file (required for provisioning)
     -n, --server-name NAME      Server name (default: nyx)
-    -t, --server-type TYPE      Server type (default: cx22)
+    -t, --server-type TYPE      Server type (default: cpx22)
     -l, --location LOCATION     Server location (default: nbg1)
     -e, --existing-server HOST  Provision existing server (skip Hetzner creation)
-    --ssh-key NAME              SSH key name in Hetzner (default: default)
+    --ssh-key NAME              SSH key name in Hetzner (auto-created if not specified)
     --dry-run                   Show what would be done
+    --update-ssh-config NAME    Update SSH config with Tailscale IP for server NAME
     --skip-secrets              Skip secrets import
     --skip-software             Skip software installation
     --skip-workspace            Skip Dropbox workspace restore
@@ -119,6 +123,10 @@ parse_args() {
             --dry-run)
                 DRY_RUN=1
                 shift
+                ;;
+            --update-ssh-config)
+                UPDATE_SSH_CONFIG_ONLY="$2"
+                shift 2
                 ;;
             --skip-secrets)
                 SKIP_SECRETS=1
@@ -192,10 +200,69 @@ check_prerequisites() {
 }
 
 # ============================================
-# Phase 1: Hetzner Server Creation
+# Phase 1: SSH Key & Hetzner Server Creation
 # ============================================
 
+# Local SSH key path (set during key creation)
+LOCAL_SSH_KEY=""
+
+create_ssh_key() {
+    log_step "Setting up SSH key for $SERVER_NAME"
+
+    local key_name="moltbot-${SERVER_NAME}"
+    local key_path="$HOME/.ssh/id_${SERVER_NAME}"
+
+    # Check if local key already exists
+    if [[ -f "$key_path" ]]; then
+        log_info "Local SSH key already exists: $key_path"
+        LOCAL_SSH_KEY="$key_path"
+
+        # Generate public key if missing
+        if [[ ! -f "${key_path}.pub" ]]; then
+            ssh-keygen -y -f "$key_path" > "${key_path}.pub"
+        fi
+    else
+        log_substep "Generating new SSH key pair"
+        ssh-keygen -t ed25519 -f "$key_path" -N "" -C "${SERVER_NAME}@moltbot"
+        chmod 600 "$key_path"
+        LOCAL_SSH_KEY="$key_path"
+        log_success "SSH key created: $key_path"
+    fi
+
+    # Check if key exists in Hetzner
+    if hcloud ssh-key describe "$key_name" &>/dev/null; then
+        log_info "SSH key '$key_name' already exists in Hetzner"
+        SSH_KEY_NAME="$key_name"
+        return 0
+    fi
+
+    # Upload to Hetzner
+    log_substep "Uploading SSH key to Hetzner"
+    if hcloud ssh-key create --name "$key_name" --public-key-from-file "${key_path}.pub" &>/dev/null; then
+        log_success "SSH key uploaded to Hetzner: $key_name"
+        SSH_KEY_NAME="$key_name"
+    else
+        # Key might already exist with different name (same fingerprint)
+        log_warn "Could not upload SSH key (may already exist with different name)"
+        log_info "Checking existing keys..."
+
+        # Try to find a matching key by testing
+        local existing_keys
+        existing_keys=$(hcloud ssh-key list -o noheader -o columns=name)
+        for existing_key in $existing_keys; do
+            SSH_KEY_NAME="$existing_key"
+            log_info "Will try using existing key: $SSH_KEY_NAME"
+            return 0
+        done
+
+        log_fatal "No usable SSH key found in Hetzner"
+    fi
+}
+
 create_hetzner_server() {
+    # Always set up SSH key (needed for remote_exec even with existing server)
+    create_ssh_key
+
     if [[ $SKIP_HETZNER -eq 1 ]]; then
         log_step "Skipping Hetzner server creation (using existing server)"
         return 0
@@ -208,7 +275,7 @@ create_hetzner_server() {
         log_warn "Server '$SERVER_NAME' already exists"
         if ! confirm "Delete and recreate?"; then
             log_info "Using existing server"
-            SKIP_HETZNER=1
+            SERVER_IP=$(hcloud server ip "$SERVER_NAME")
             return 0
         fi
 
@@ -223,20 +290,25 @@ create_hetzner_server() {
         log_info "  Image: $SERVER_IMAGE"
         log_info "  Location: $SERVER_LOCATION"
         log_info "  SSH Key: $SSH_KEY_NAME"
+        log_info "  Local Key: $LOCAL_SSH_KEY"
         return 0
     fi
 
     log_substep "Creating $SERVER_TYPE server in $SERVER_LOCATION"
 
     local server_output
-    server_output=$(hcloud server create \
+    if ! server_output=$(hcloud server create \
         --name "$SERVER_NAME" \
         --type "$SERVER_TYPE" \
         --image "$SERVER_IMAGE" \
         --location "$SERVER_LOCATION" \
         --ssh-key "$SSH_KEY_NAME" \
         --poll-interval 2s \
-        2>&1)
+        2>&1); then
+        log_error "Server creation failed:"
+        log_error "$server_output"
+        exit 1
+    fi
 
     log_debug "$server_output"
 
@@ -248,10 +320,12 @@ create_hetzner_server() {
     log_substep "Waiting for SSH to be ready"
     local max_attempts=30
     local attempt=0
+    local ssh_opts="-o ConnectTimeout=5 -o StrictHostKeyChecking=no -o BatchMode=yes"
+    [[ -n "$LOCAL_SSH_KEY" ]] && ssh_opts="$ssh_opts -i $LOCAL_SSH_KEY"
 
     while [[ $attempt -lt $max_attempts ]]; do
-        if ssh -o ConnectTimeout=5 -o StrictHostKeyChecking=no -o BatchMode=yes \
-            "root@${SERVER_IP}" "echo ready" &>/dev/null; then
+        # shellcheck disable=SC2086
+        if ssh $ssh_opts "root@${SERVER_IP}" "echo ready" &>/dev/null; then
             log_success "SSH is ready"
             break
         fi
@@ -270,20 +344,29 @@ create_hetzner_server() {
 
 remote_exec() {
     local host="${EXISTING_SERVER:-root@${SERVER_IP}}"
-    ssh -o StrictHostKeyChecking=no -o BatchMode=yes "$host" "$@"
+    local ssh_opts="-o StrictHostKeyChecking=no -o BatchMode=yes"
+    [[ -n "$LOCAL_SSH_KEY" ]] && ssh_opts="$ssh_opts -i $LOCAL_SSH_KEY"
+    # shellcheck disable=SC2086
+    ssh $ssh_opts "$host" "$@"
 }
 
 remote_exec_script() {
     local script="$1"
     local host="${EXISTING_SERVER:-root@${SERVER_IP}}"
-    ssh -o StrictHostKeyChecking=no -o BatchMode=yes "$host" "bash -s" < "$script"
+    local ssh_opts="-o StrictHostKeyChecking=no -o BatchMode=yes"
+    [[ -n "$LOCAL_SSH_KEY" ]] && ssh_opts="$ssh_opts -i $LOCAL_SSH_KEY"
+    # shellcheck disable=SC2086
+    ssh $ssh_opts "$host" "bash -s" < "$script"
 }
 
 remote_copy() {
     local src="$1"
     local dest="$2"
     local host="${EXISTING_SERVER:-root@${SERVER_IP}}"
-    scp -o StrictHostKeyChecking=no "$src" "${host}:${dest}"
+    local scp_opts="-o StrictHostKeyChecking=no"
+    [[ -n "$LOCAL_SSH_KEY" ]] && scp_opts="$scp_opts -i $LOCAL_SSH_KEY"
+    # shellcheck disable=SC2086
+    scp $scp_opts "$src" "${host}:${dest}"
 }
 
 # ============================================
@@ -359,11 +442,11 @@ configure_security() {
     remote_copy "${REPO_DIR}/security/sshd-hardening.conf" "/tmp/nyx-setup/security/"
     remote_copy "${REPO_DIR}/security/setup-security.sh" "/tmp/nyx-setup/security/"
 
-    # Run security setup
+    # Run security setup (skip SSH hardening until final phase)
     log_substep "Running security setup"
-    remote_exec "chmod +x /tmp/nyx-setup/security/*.sh && /tmp/nyx-setup/security/setup-security.sh"
+    remote_exec "chmod +x /tmp/nyx-setup/security/*.sh && /tmp/nyx-setup/security/setup-security.sh --skip-ssh-hardening"
 
-    log_success "Security stack installed"
+    log_success "Security stack installed (SSH hardening deferred to final phase)"
 }
 
 # ============================================
@@ -383,9 +466,16 @@ import_secrets() {
         return 0
     fi
 
-    # Install age on remote
-    log_substep "Installing age encryption tool"
+    # Install prerequisites for secrets import
+    log_substep "Installing prerequisites (age, jq)"
     remote_exec "bash -s" <<'SCRIPT'
+# Install jq if missing
+if ! command -v jq &>/dev/null; then
+    echo "Installing jq..."
+    apt-get update -qq && apt-get install -y -qq jq
+fi
+
+# Install age if missing
 if ! command -v age &>/dev/null; then
     echo "Installing age..."
     AGE_VERSION="1.1.1"
@@ -394,7 +484,9 @@ if ! command -v age &>/dev/null; then
     mv age/age age/age-keygen /usr/local/bin/
     rm -rf age "age-v${AGE_VERSION}-linux-amd64.tar.gz"
 fi
-age --version
+
+echo "jq: $(jq --version)"
+echo "age: $(age --version)"
 SCRIPT
 
     # Copy import script and bundle
@@ -404,14 +496,30 @@ SCRIPT
     remote_copy "${SCRIPT_DIR}/nyx-import-secrets.sh" "/tmp/nyx-setup/provision/"
     remote_copy "$SECRETS_BUNDLE" "/tmp/nyx-secrets-bundle.tar.gz.age"
 
-    # Run import (interactive - needs passphrase)
+    # Prompt for passphrase locally
     log_substep "Running secrets import"
-    log_warn "You will be prompted for the bundle passphrase"
+    echo ""
+    echo -e "${YELLOW}Enter the passphrase for the secrets bundle:${NC}"
+    read -rs BUNDLE_PASSPHRASE
     echo ""
 
+    if [[ -z "$BUNDLE_PASSPHRASE" ]]; then
+        log_fatal "Passphrase is required"
+    fi
+
+    # Run import with passphrase via stdin (secure - not exposed in process list)
+    log_debug "Passing passphrase via stdin to remote import script"
     local host="${EXISTING_SERVER:-root@${SERVER_IP}}"
-    ssh -t -o StrictHostKeyChecking=no "$host" \
-        "chmod +x /tmp/nyx-setup/provision/nyx-import-secrets.sh && /tmp/nyx-setup/provision/nyx-import-secrets.sh --bundle /tmp/nyx-secrets-bundle.tar.gz.age --user $TARGET_USER"
+    local ssh_opts="-o StrictHostKeyChecking=no -o BatchMode=yes"
+    [[ -n "$LOCAL_SSH_KEY" ]] && ssh_opts="$ssh_opts -i $LOCAL_SSH_KEY"
+
+    # Pipe passphrase to remote script via stdin
+    # shellcheck disable=SC2086
+    echo "$BUNDLE_PASSPHRASE" | ssh $ssh_opts "$host" \
+        "chmod +x /tmp/nyx-setup/provision/nyx-import-secrets.sh && /tmp/nyx-setup/provision/nyx-import-secrets.sh --bundle /tmp/nyx-secrets-bundle.tar.gz.age --user $TARGET_USER --passphrase-stdin --yes"
+
+    # Clear passphrase from memory
+    BUNDLE_PASSPHRASE=""
 
     # Cleanup bundle from remote
     remote_exec "rm -f /tmp/nyx-secrets-bundle.tar.gz.age"
@@ -789,6 +897,86 @@ SCRIPT
 }
 
 # ============================================
+# ============================================
+# SSH Config Management
+# ============================================
+
+update_ssh_config() {
+    local tailscale_ip="${1:-}"
+    local config_dir="$HOME/.ssh/config.d"
+    local config_file="$config_dir/moltbot-servers"
+
+    log_step "Updating local SSH config"
+
+    # Create config.d directory if needed
+    mkdir -p "$config_dir"
+
+    # Determine which IP to use for the main entry
+    local main_ip="${tailscale_ip:-$SERVER_IP}"
+    local ip_comment=""
+    if [[ -z "$tailscale_ip" ]]; then
+        ip_comment="  # TODO: Update HostName to Tailscale IP after authentication"
+    fi
+
+    # Check if entry already exists, remove it first
+    if [[ -f "$config_file" ]]; then
+        # Remove existing entries for this server
+        sed -i.bak "/^# --- $SERVER_NAME ---$/,/^# --- end $SERVER_NAME ---$/d" "$config_file" 2>/dev/null || true
+        rm -f "${config_file}.bak"
+    fi
+
+    # Append new entries
+    cat >> "$config_file" << EOF
+
+# --- $SERVER_NAME ---
+# Added by nyx-provision.sh on $(date '+%Y-%m-%d %H:%M')
+
+# Root access via public IP (for initial setup)
+Host ${SERVER_NAME}-root
+    HostName $SERVER_IP
+    User root
+    IdentityFile $LOCAL_SSH_KEY
+    StrictHostKeyChecking no
+
+# User access (use Tailscale IP when available)
+Host $SERVER_NAME
+    HostName $main_ip$ip_comment
+    User $TARGET_USER
+    IdentityFile $LOCAL_SSH_KEY
+    StrictHostKeyChecking no
+
+# --- end $SERVER_NAME ---
+EOF
+
+    chmod 600 "$config_file"
+
+    # Check if main SSH config includes config.d
+    local main_config="$HOME/.ssh/config"
+    if [[ -f "$main_config" ]] && ! grep -q "Include.*config.d" "$main_config" 2>/dev/null; then
+        # Main config exists but doesn't include config.d
+        if [[ -L "$main_config" ]]; then
+            # It's a symlink (Nix-managed), can't modify
+            log_warn "SSH config is Nix-managed. Add this to your home-manager config:"
+            echo ""
+            echo "  programs.ssh.includes = [ \"~/.ssh/config.d/*\" ];"
+            echo ""
+        else
+            # Regular file, prepend Include directive
+            local temp_config
+            temp_config=$(mktemp)
+            echo "Include ~/.ssh/config.d/*" > "$temp_config"
+            echo "" >> "$temp_config"
+            cat "$main_config" >> "$temp_config"
+            mv "$temp_config" "$main_config"
+            log_success "Added Include directive to ~/.ssh/config"
+        fi
+    fi
+
+    log_success "SSH config updated: $config_file"
+    log_info "You can now use: ssh ${SERVER_NAME}-root (root) or ssh $SERVER_NAME (${TARGET_USER})"
+}
+
+# ============================================
 # Phase 10: Final Steps
 # ============================================
 
@@ -808,6 +996,32 @@ final_steps() {
     log_substep "Checking service status"
     remote_exec "systemctl status clawdbot.service --no-pager || true"
 
+    # Apply SSH hardening (now that fx user is fully set up)
+    log_substep "Applying SSH hardening"
+    remote_exec "bash -s" <<'SCRIPT'
+set -e
+SSH_CONFIG_DIR="/etc/ssh/sshd_config.d"
+HARDENING_SRC="/tmp/nyx-setup/security/sshd-hardening.conf"
+
+if [[ -f "$HARDENING_SRC" ]]; then
+    mkdir -p "$SSH_CONFIG_DIR"
+    cp "$HARDENING_SRC" "${SSH_CONFIG_DIR}/99-hardening.conf"
+    echo "Installed SSH hardening configuration"
+
+    if sshd -t; then
+        echo "SSH configuration valid"
+        systemctl restart ssh
+        echo "SSH service restarted with hardening"
+    else
+        echo "ERROR: SSH configuration test failed!"
+        rm -f "${SSH_CONFIG_DIR}/99-hardening.conf"
+        echo "Removed invalid configuration"
+    fi
+else
+    echo "WARN: SSH hardening config not found, skipping"
+fi
+SCRIPT
+
     # Cleanup
     log_substep "Cleaning up"
     remote_exec "rm -rf /tmp/nyx-setup"
@@ -819,8 +1033,73 @@ final_steps() {
 # Main
 # ============================================
 
+update_ssh_config_standalone() {
+    local server_name="$1"
+    local key_path="$HOME/.ssh/id_${server_name}"
+    local config_file="$HOME/.ssh/config.d/moltbot-servers"
+
+    log_step "Fetching Tailscale IP for $server_name"
+
+    # Check if SSH key exists
+    if [[ ! -f "$key_path" ]]; then
+        log_fatal "SSH key not found: $key_path"
+    fi
+
+    # Get server IP from Hetzner
+    local public_ip
+    public_ip=$(hcloud server ip "$server_name" 2>/dev/null || echo "")
+    if [[ -z "$public_ip" ]]; then
+        log_fatal "Server '$server_name' not found in Hetzner"
+    fi
+
+    # Get Tailscale IP from server
+    log_substep "Connecting to $server_name to get Tailscale IP"
+    local tailscale_ip
+    tailscale_ip=$(ssh -i "$key_path" -o StrictHostKeyChecking=no -o BatchMode=yes \
+        "root@${public_ip}" "tailscale ip -4 2>/dev/null" 2>/dev/null || echo "")
+
+    if [[ -z "$tailscale_ip" ]]; then
+        log_error "Could not get Tailscale IP. Is Tailscale authenticated?"
+        log_info "Run: ssh -i $key_path root@$public_ip 'tailscale up'"
+        exit 1
+    fi
+
+    log_success "Tailscale IP: $tailscale_ip"
+
+    # Update the SSH config file
+    if [[ -f "$config_file" ]]; then
+        log_substep "Updating SSH config with Tailscale IP"
+        # Update the HostName for the main entry (non-root)
+        sed -i.bak "s/^Host ${server_name}$/Host ${server_name}\n# Updated with Tailscale IP on $(date '+%Y-%m-%d %H:%M')/" "$config_file" 2>/dev/null || true
+        # Replace HostName line after "Host server_name" section
+        sed -i.bak "/^Host ${server_name}$/,/^Host /{s/HostName .*/HostName $tailscale_ip/}" "$config_file" 2>/dev/null || true
+        # Remove TODO comment if present
+        sed -i.bak "s/  # TODO: Update HostName.*$//" "$config_file" 2>/dev/null || true
+        rm -f "${config_file}.bak"
+        log_success "SSH config updated"
+    else
+        log_warn "SSH config file not found: $config_file"
+    fi
+
+    echo ""
+    echo "════════════════════════════════════════════════════════════"
+    echo "  Server:       $server_name"
+    echo "  Public IP:    $public_ip"
+    echo "  Tailscale IP: $tailscale_ip"
+    echo "════════════════════════════════════════════════════════════"
+    echo ""
+    echo "You can now connect with: ssh $server_name"
+    echo ""
+}
+
 main() {
     parse_args "$@"
+
+    # Handle standalone --update-ssh-config mode
+    if [[ -n "$UPDATE_SSH_CONFIG_ONLY" ]]; then
+        update_ssh_config_standalone "$UPDATE_SSH_CONFIG_ONLY"
+        exit 0
+    fi
 
     banner "Nyx Server Provisioning"
 
@@ -854,20 +1133,47 @@ main() {
     setup_backups
     final_steps
 
+    # Try to get Tailscale IP (may not be available if not authenticated yet)
+    local tailscale_ip=""
+    tailscale_ip=$(remote_exec "tailscale ip -4 2>/dev/null" 2>/dev/null || echo "")
+
+    # Update local SSH config
+    update_ssh_config "$tailscale_ip"
+
     separator
     echo ""
     log_success "Nyx server provisioned successfully!"
     echo ""
-    echo "Server details:"
-    [[ -n "${SERVER_IP:-}" ]] && echo "  IP: $SERVER_IP"
-    echo "  Name: $SERVER_NAME"
-    echo "  User: $TARGET_USER"
+    echo "════════════════════════════════════════════════════════════"
+    echo "                     SERVER SUMMARY"
+    echo "════════════════════════════════════════════════════════════"
+    echo ""
+    echo "  Server Name:      $SERVER_NAME"
+    echo "  Public IP:        ${SERVER_IP:-N/A}"
+    if [[ -n "$tailscale_ip" ]]; then
+        echo "  Tailscale IP:     $tailscale_ip"
+    else
+        echo "  Tailscale IP:     (pending authentication)"
+    fi
+    echo ""
+    echo "  SSH Private Key:  ${LOCAL_SSH_KEY:-N/A}"
+    echo "  SSH Public Key:   ${LOCAL_SSH_KEY:-N/A}.pub"
+    echo ""
+    echo "════════════════════════════════════════════════════════════"
     echo ""
     echo "Next steps:"
-    echo "  1. Connect via Tailscale: ssh $TARGET_USER@$SERVER_NAME"
-    echo "  2. If Tailscale not connected: ssh root@${SERVER_IP:-$EXISTING_SERVER}"
-    echo "  3. Run verification: ./provision/nyx-verify.sh"
-    echo "  4. Check Telegram bot is responding"
+    echo "  1. Authenticate Tailscale:"
+    echo "     ssh ${SERVER_NAME}-root 'tailscale up'"
+    echo ""
+    echo "  2. After Tailscale auth, update SSH config with Tailscale IP:"
+    echo "     Run: ./provision/nyx-provision.sh --update-ssh-config $SERVER_NAME"
+    echo ""
+    echo "  3. Then connect via: ssh $SERVER_NAME"
+    echo ""
+    echo "  4. Run verification:"
+    echo "     ./provision/nyx-verify.sh --remote $SERVER_NAME"
+    echo ""
+    echo "  5. Test Telegram bot is responding"
     echo ""
 }
 

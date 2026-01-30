@@ -13,8 +13,11 @@ source "${SCRIPT_DIR}/lib/logging.sh"
 
 # Default values
 BUNDLE_FILE=""
+PASSPHRASE=""
+PASSPHRASE_STDIN=0
 DRY_RUN=0
 VERBOSE=0
+YES_MODE=0
 TARGET_USER="fx"
 TARGET_HOME="/home/fx"
 AGE_KEY_DIR="/root/.config/sops/age"
@@ -27,17 +30,21 @@ Usage: $(basename "$0") [OPTIONS]
 Import secrets bundle to new Nyx server.
 
 OPTIONS:
-    -b, --bundle FILE    Bundle file path (required)
-    -u, --user USER      Target user (default: fx)
-    -n, --dry-run        Verify bundle without installing
-    -v, --verbose        Verbose output
-    -h, --help           Show this help message
+    -b, --bundle FILE       Bundle file path (required)
+    -p, --passphrase PASS   Passphrase for decryption (or prompts if not provided)
+    --passphrase-stdin      Read passphrase from stdin (more secure for scripts)
+    -u, --user USER         Target user (default: fx)
+    -y, --yes               Skip confirmation prompts (for automated runs)
+    -n, --dry-run           Verify bundle without installing
+    -v, --verbose           Verbose output
+    -h, --help              Show this help message
 
 EXAMPLE:
     sudo ./nyx-import-secrets.sh --bundle /tmp/nyx-secrets-bundle.tar.gz.age
+    sudo ./nyx-import-secrets.sh --bundle /tmp/bundle.tar.gz.age --passphrase "secret"
     sudo ./nyx-import-secrets.sh --bundle /tmp/bundle.tar.gz.age --dry-run
 
-The script will prompt for the passphrase to decrypt the bundle.
+If --passphrase is not provided, the script will prompt interactively.
 EOF
 }
 
@@ -49,10 +56,22 @@ parse_args() {
                 BUNDLE_FILE="$2"
                 shift 2
                 ;;
+            -p|--passphrase)
+                PASSPHRASE="$2"
+                shift 2
+                ;;
+            --passphrase-stdin)
+                PASSPHRASE_STDIN=1
+                shift
+                ;;
             -u|--user)
                 TARGET_USER="$2"
                 TARGET_HOME="/home/$2"
                 shift 2
+                ;;
+            -y|--yes)
+                YES_MODE=1
+                shift
                 ;;
             -n|--dry-run)
                 DRY_RUN=1
@@ -109,17 +128,32 @@ extract_bundle() {
 
     log_step "Decrypting bundle"
 
-    echo ""
-    echo -e "${YELLOW}Enter the passphrase for the bundle:${NC}"
-    echo ""
-
     # Decrypt bundle
     local temp_tar
     temp_tar=$(mktemp)
 
-    if ! age -d -o "$temp_tar" "$bundle"; then
-        rm -f "$temp_tar"
-        log_fatal "Failed to decrypt bundle (wrong passphrase?)"
+    # Read passphrase from stdin if requested
+    if [[ $PASSPHRASE_STDIN -eq 1 ]]; then
+        log_debug "Reading passphrase from stdin"
+        read -rs PASSPHRASE
+    fi
+
+    if [[ -n "$PASSPHRASE" ]]; then
+        # Use provided passphrase (non-interactive)
+        log_debug "Using provided passphrase"
+        if ! echo "$PASSPHRASE" | age -d -o "$temp_tar" "$bundle" 2>/dev/null; then
+            rm -f "$temp_tar"
+            log_fatal "Failed to decrypt bundle (wrong passphrase?)"
+        fi
+    else
+        # Interactive prompt
+        echo ""
+        echo -e "${YELLOW}Enter the passphrase for the bundle:${NC}"
+        echo ""
+        if ! age -d -o "$temp_tar" "$bundle"; then
+            rm -f "$temp_tar"
+            log_fatal "Failed to decrypt bundle (wrong passphrase?)"
+        fi
     fi
 
     log_success "Bundle decrypted"
@@ -380,11 +414,15 @@ main() {
         exit 0
     fi
 
-    # Confirm installation
-    echo ""
-    if ! confirm "Install secrets to $TARGET_HOME?"; then
-        log_info "Installation cancelled"
-        exit 0
+    # Confirm installation (skip if --yes mode)
+    if [[ $YES_MODE -eq 0 ]]; then
+        echo ""
+        if ! confirm "Install secrets to $TARGET_HOME?"; then
+            log_info "Installation cancelled"
+            exit 0
+        fi
+    else
+        log_info "Installing secrets to $TARGET_HOME (--yes mode)"
     fi
 
     # Install secrets
