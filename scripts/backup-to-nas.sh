@@ -299,6 +299,8 @@ Rsync connection test failed"
     if [[ $DRY_RUN -eq 1 ]]; then
         echo ""
         echo "Dry-run complete. Run without --dry-run to perform actual backup."
+    else
+        send_telegram "✓ Nyx NAS backup completed"
     fi
 }
 
