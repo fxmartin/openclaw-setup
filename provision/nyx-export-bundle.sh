@@ -89,7 +89,7 @@ EXAMPLES:
 OUTPUT:
     Creates an AGE-encrypted tarball containing:
     - AGE private key (master encryption key)
-    - SOPS-encrypted clawdbot config
+    - SOPS-encrypted openclaw config
     - All encrypted secrets from ~/.secrets/
     - GitHub CLI and rclone configs (freshly encrypted)
     - Manifest with SHA256 checksums
@@ -213,15 +213,15 @@ echo "  [+] AGE private key" >&2
 # Get public key for encryption
 pub_key=$(grep "public key:" "$AGE_KEY_FILE" | cut -d: -f2 | tr -d ' ')
 
-# 2. Clawdbot config
-if [[ -f "${USER_HOME}/.clawdbot/clawdbot.json.enc" ]]; then
-    cp "${USER_HOME}/.clawdbot/clawdbot.json.enc" "${STAGING}/sops/"
-    echo "  [+] clawdbot.json.enc" >&2
+# 2. Openclaw config
+if [[ -f "${USER_HOME}/.openclaw/openclaw.json.enc" ]]; then
+    cp "${USER_HOME}/.openclaw/openclaw.json.enc" "${STAGING}/sops/"
+    echo "  [+] openclaw.json.enc" >&2
 fi
 
 # 3. SOPS config
-if [[ -f "${USER_HOME}/.clawdbot/.sops.yaml" ]]; then
-    cp "${USER_HOME}/.clawdbot/.sops.yaml" "${STAGING}/sops-config/"
+if [[ -f "${USER_HOME}/.openclaw/.sops.yaml" ]]; then
+    cp "${USER_HOME}/.openclaw/.sops.yaml" "${STAGING}/sops-config/"
     echo "  [+] .sops.yaml" >&2
 fi
 
@@ -254,9 +254,9 @@ if [[ -f "${USER_HOME}/.rsync-nas-password" ]]; then
     echo "  [+] rsync-nas-password.enc (encrypted)" >&2
 fi
 
-# 8. Additional credentials from clawdbot
+# 8. Additional credentials from openclaw
 shopt -s nullglob
-for cred_file in "${USER_HOME}/.clawdbot/credentials"/*.enc; do
+for cred_file in "${USER_HOME}/.openclaw/credentials"/*.enc; do
     if [[ -f "$cred_file" ]]; then
         cp "$cred_file" "${STAGING}/secrets/"
         echo "  [+] $(basename "$cred_file")" >&2
@@ -394,15 +394,15 @@ verify_bundle() {
     file_count=$(tar -tzf "$test_tar" | wc -l)
 
     # Check for key files
-    local has_age_key has_clawdbot has_manifest
+    local has_age_key has_openclaw has_manifest
     has_age_key=$(tar -tzf "$test_tar" | grep -c "age/keys.txt" || true)
-    has_clawdbot=$(tar -tzf "$test_tar" | grep -c "clawdbot.json.enc" || true)
+    has_openclaw=$(tar -tzf "$test_tar" | grep -c "openclaw.json.enc" || true)
     has_manifest=$(tar -tzf "$test_tar" | grep -c "manifest.json" || true)
 
-    if [[ $has_age_key -gt 0 ]] && [[ $has_clawdbot -gt 0 ]] && [[ $has_manifest -gt 0 ]]; then
+    if [[ $has_age_key -gt 0 ]] && [[ $has_openclaw -gt 0 ]] && [[ $has_manifest -gt 0 ]]; then
         log_success "Bundle verified: $file_count files"
         log_success "  - AGE key: present"
-        log_success "  - Clawdbot config: present"
+        log_success "  - Openclaw config: present"
         log_success "  - Manifest: present"
     else
         log_error "Bundle verification failed"
@@ -429,13 +429,13 @@ if [[ -f "$AGE_KEY_FILE" ]]; then
     echo "  age/keys.txt (AGE private key)"
 fi
 
-# Clawdbot config
-if [[ -f "${USER_HOME}/.clawdbot/clawdbot.json.enc" ]]; then
-    echo "  sops/clawdbot.json.enc"
+# Openclaw config
+if [[ -f "${USER_HOME}/.openclaw/openclaw.json.enc" ]]; then
+    echo "  sops/openclaw.json.enc"
 fi
 
 # SOPS config
-if [[ -f "${USER_HOME}/.clawdbot/.sops.yaml" ]]; then
+if [[ -f "${USER_HOME}/.openclaw/.sops.yaml" ]]; then
     echo "  sops-config/.sops.yaml"
 fi
 
@@ -463,7 +463,7 @@ fi
 
 # Additional credentials
 shopt -s nullglob
-for cred_file in "${USER_HOME}/.clawdbot/credentials"/*.enc; do
+for cred_file in "${USER_HOME}/.openclaw/credentials"/*.enc; do
     echo "  secrets/$(basename "$cred_file")"
 done
 shopt -u nullglob

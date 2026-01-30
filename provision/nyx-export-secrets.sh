@@ -110,20 +110,20 @@ collect_files() {
         log_fatal "AGE private key not found at $AGE_KEY_FILE"
     fi
 
-    # 2. SOPS-encrypted clawdbot config
-    log_substep "Clawdbot config"
-    local clawdbot_dir="${USER_HOME}/.clawdbot"
-    if [[ -f "${clawdbot_dir}/clawdbot.json.enc" ]]; then
-        cp "${clawdbot_dir}/clawdbot.json.enc" "${staging_dir}/sops/"
-        log_success "  Collected: clawdbot.json.enc"
+    # 2. SOPS-encrypted openclaw config
+    log_substep "Openclaw config"
+    local openclaw_dir="${USER_HOME}/.openclaw"
+    if [[ -f "${openclaw_dir}/openclaw.json.enc" ]]; then
+        cp "${openclaw_dir}/openclaw.json.enc" "${staging_dir}/sops/"
+        log_success "  Collected: openclaw.json.enc"
     else
-        log_warn "  Not found: clawdbot.json.enc"
+        log_warn "  Not found: openclaw.json.enc"
     fi
 
     # 3. SOPS configuration
     log_substep "SOPS config"
-    if [[ -f "${clawdbot_dir}/.sops.yaml" ]]; then
-        cp "${clawdbot_dir}/.sops.yaml" "${staging_dir}/sops-config/"
+    if [[ -f "${openclaw_dir}/.sops.yaml" ]]; then
+        cp "${openclaw_dir}/.sops.yaml" "${staging_dir}/sops-config/"
         log_success "  Collected: .sops.yaml"
     else
         log_warn "  Not found: .sops.yaml"
@@ -202,7 +202,7 @@ collect_files() {
     log_substep "Email configs"
     local email_count=0
     shopt -s nullglob
-    for email_conf in "${USER_HOME}/.config/himalaya"/*.enc "${clawdbot_dir}/credentials"/*.enc; do
+    for email_conf in "${USER_HOME}/.config/himalaya"/*.enc "${openclaw_dir}/credentials"/*.enc; do
         if [[ -f "$email_conf" ]]; then
             cp "$email_conf" "${staging_dir}/secrets/"
             log_debug "  Collected: $(basename "$email_conf")"

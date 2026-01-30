@@ -1,11 +1,11 @@
-# Sudoers rules for clawdbot secret decryption
-# Install to: /etc/sudoers.d/clawdbot-decrypt (root:root 440)
+# Sudoers rules for openclaw secret decryption
+# Install to: /etc/sudoers.d/openclaw-decrypt (root:root 440)
 #
 # Allows user fx to run specific decrypt scripts without password.
 # These scripts are narrowly scoped to only decrypt secrets.
 #
 # IMPORTANT: Use visudo -c to validate after installation:
-#   sudo visudo -cf /etc/sudoers.d/clawdbot-decrypt
+#   sudo visudo -cf /etc/sudoers.d/openclaw-decrypt
 
 # Allow fx to run decrypt helpers without password
 fx ALL=(root) NOPASSWD: /usr/local/bin/sops-decrypt-config

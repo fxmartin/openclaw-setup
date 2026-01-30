@@ -24,7 +24,7 @@ RSYNC_USER="rsync-user"
 RSYNC_HOST="100.98.9.111"
 RSYNC_MODULE="Backup"
 RSYNC_PASSWORD_FILE="$HOME/.rsync-nas-password"
-TELEGRAM_TOKEN_FILE="$HOME/.clawdbot/runtime/telegram-bot-token"
+TELEGRAM_TOKEN_FILE="$HOME/.openclaw/runtime/telegram-bot-token"
 TELEGRAM_CHAT_ID="8332440542"
 
 # Excludes for clawd
@@ -38,8 +38,8 @@ CLAWD_EXCLUDES=(
     ".pytest_cache"
 )
 
-# Excludes for clawdbot
-CLAWDBOT_EXCLUDES=(
+# Excludes for openclaw
+OPENCLAW_EXCLUDES=(
     "telegram"
     "agents/*/sessions"
     "runtime"
@@ -170,9 +170,9 @@ sync_clawd() {
     log "Sync of clawd complete"
 }
 
-sync_clawdbot() {
-    local src="$HOME/.clawdbot/"
-    local dest="rsync://${RSYNC_USER}@${RSYNC_HOST}/${RSYNC_MODULE}/nyx/clawdbot/"
+sync_openclaw() {
+    local src="$HOME/.openclaw/"
+    local dest="rsync://${RSYNC_USER}@${RSYNC_HOST}/${RSYNC_MODULE}/nyx/openclaw/"
 
     if [[ ! -d "$src" ]]; then
         log "WARN: Source directory does not exist: $src"
@@ -183,7 +183,7 @@ sync_clawdbot() {
 
     local rsync_opts="-avz --delete --password-file=$RSYNC_PASSWORD_FILE"
 
-    for exclude in "${CLAWDBOT_EXCLUDES[@]}"; do
+    for exclude in "${OPENCLAW_EXCLUDES[@]}"; do
         rsync_opts+=" --exclude=$exclude"
     done
 
@@ -194,7 +194,7 @@ sync_clawdbot() {
     # shellcheck disable=SC2086
     rsync $rsync_opts "$src" "$dest" 2>&1 | tee -a "$LOG_FILE"
 
-    log "Sync of clawdbot complete"
+    log "Sync of openclaw complete"
 }
 
 # ============================================
@@ -291,7 +291,7 @@ Rsync connection test failed"
 
     # Run backups
     sync_clawd
-    sync_clawdbot
+    sync_openclaw
 
     log "NAS backup completed successfully"
     log "========================================"

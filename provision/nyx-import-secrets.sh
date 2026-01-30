@@ -260,27 +260,27 @@ install_secrets() {
         log_fatal "AGE private key not found in bundle"
     fi
 
-    # 2. Install SOPS-encrypted clawdbot config
-    log_substep "Clawdbot config"
-    local clawdbot_dir="${TARGET_HOME}/.clawdbot"
-    mkdir -p "$clawdbot_dir"
-    chown "${target_uid}:${target_gid}" "$clawdbot_dir"
+    # 2. Install SOPS-encrypted openclaw config
+    log_substep "Openclaw config"
+    local openclaw_dir="${TARGET_HOME}/.openclaw"
+    mkdir -p "$openclaw_dir"
+    chown "${target_uid}:${target_gid}" "$openclaw_dir"
 
-    if [[ -f "${staging_dir}/sops/clawdbot.json.enc" ]]; then
-        cp "${staging_dir}/sops/clawdbot.json.enc" "${clawdbot_dir}/"
-        chown "${target_uid}:${target_gid}" "${clawdbot_dir}/clawdbot.json.enc"
-        chmod 644 "${clawdbot_dir}/clawdbot.json.enc"
-        log_success "  Installed: clawdbot.json.enc"
+    if [[ -f "${staging_dir}/sops/openclaw.json.enc" ]]; then
+        cp "${staging_dir}/sops/openclaw.json.enc" "${openclaw_dir}/"
+        chown "${target_uid}:${target_gid}" "${openclaw_dir}/openclaw.json.enc"
+        chmod 644 "${openclaw_dir}/openclaw.json.enc"
+        log_success "  Installed: openclaw.json.enc"
     else
-        log_warn "  Not found in bundle: clawdbot.json.enc"
+        log_warn "  Not found in bundle: openclaw.json.enc"
     fi
 
     # 3. Install SOPS config
     log_substep "SOPS config"
     if [[ -f "${staging_dir}/sops-config/.sops.yaml" ]]; then
-        cp "${staging_dir}/sops-config/.sops.yaml" "${clawdbot_dir}/"
-        chown "${target_uid}:${target_gid}" "${clawdbot_dir}/.sops.yaml"
-        chmod 644 "${clawdbot_dir}/.sops.yaml"
+        cp "${staging_dir}/sops-config/.sops.yaml" "${openclaw_dir}/"
+        chown "${target_uid}:${target_gid}" "${openclaw_dir}/.sops.yaml"
+        chmod 644 "${openclaw_dir}/.sops.yaml"
         log_success "  Installed: .sops.yaml"
     fi
 
@@ -434,7 +434,7 @@ main() {
     echo ""
     echo "Next steps:"
     echo "  1. Run verification: ./nyx-verify.sh"
-    echo "  2. Start clawdbot service"
+    echo "  2. Start openclaw service"
     echo ""
 }
 

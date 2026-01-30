@@ -1,6 +1,6 @@
 # Nyx Server Setup
 
-> Self-documented server configuration for the Nyx Clawdbot instance.
+> Self-documented server configuration for the Nyx Openclaw instance.
 > Last updated: 2026-01-25
 
 ## Server Specifications
@@ -25,7 +25,7 @@
 - Daily 3am: Dropbox backup
 - Sunday 4am: Security scan
 
-## Clawdbot
+## Openclaw
 - Telegram channel enabled
 - Workspace: ~/clawd/
-- Config: ~/.clawdbot/
+- Config: ~/.openclaw/

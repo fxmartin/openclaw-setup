@@ -14,18 +14,18 @@ Clawdbot secrets are encrypted at rest using **age** (encryption) + **sops** (se
 │                          │                                   │
 │                          ▼                                   │
 │  ┌─────────────────────────────────────────────┐            │
-│  │  /usr/local/bin/clawdbot-start.sh           │            │
-│  │  - sops decrypt clawdbot.json.enc           │            │
+│  │  /usr/local/bin/openclaw-start.sh           │            │
+│  │  - sops decrypt openclaw.json.enc           │            │
 │  │  - age decrypt telegram-bot-token.enc       │            │
 │  └─────────────────────────────────────────────┘            │
 │                          │                                   │
 │                          ▼                                   │
 │  Runtime decrypted files (fx-owned, 600 perms):             │
-│  - ~/.clawdbot/clawdbot.json                                │
+│  - ~/.openclaw/openclaw.json                                │
 │  - ~/.secrets/telegram-bot-token                            │
 │                          │                                   │
 │                          ▼                                   │
-│              clawdbot gateway start                          │
+│              openclaw gateway start                          │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -34,18 +34,18 @@ Clawdbot secrets are encrypted at rest using **age** (encryption) + **sops** (se
 | File | Purpose | Permissions |
 |------|---------|-------------|
 | `/root/.config/sops/age/keys.txt` | Age private key | root:root 600 |
-| `~/.clawdbot/clawdbot.json.enc` | Encrypted config | fx:fx 644 |
+| `~/.openclaw/openclaw.json.enc` | Encrypted config | fx:fx 644 |
 | `~/.secrets/telegram-bot-token.enc` | Encrypted telegram token | fx:fx 644 |
-| `~/.clawdbot/.sops.yaml` | SOPS config (which fields to encrypt) | fx:fx 644 |
-| `/usr/local/bin/clawdbot-start.sh` | Startup wrapper script | root:root 755 |
-| `/etc/systemd/system/clawdbot.service` | Systemd service | root:root 644 |
+| `~/.openclaw/.sops.yaml` | SOPS config (which fields to encrypt) | fx:fx 644 |
+| `/usr/local/bin/openclaw-start.sh` | Startup wrapper script | root:root 755 |
+| `/etc/systemd/system/openclaw.service` | Systemd service | root:root 644 |
 
 ## Backup Location
 
 Dropbox: `nyx-backup/secrets/`
 - `age/age-keys-backup.txt` — private key backup
-- `clawdbot/clawdbot.json.enc` — encrypted config
-- `clawdbot/telegram-bot-token.enc` — encrypted token
+- `openclaw/openclaw.json.enc` — encrypted config
+- `openclaw/telegram-bot-token.enc` — encrypted token
 
 ## Key Commands
 
@@ -58,7 +58,7 @@ sudo cat /root/.config/sops/age/keys.txt | grep "public key:"
 ### Decrypt config manually
 ```bash
 sudo SOPS_AGE_KEY_FILE=/root/.config/sops/age/keys.txt \
-  sops -d --output-type json ~/.clawdbot/clawdbot.json.enc
+  sops -d --output-type json ~/.openclaw/openclaw.json.enc
 ```
 
 ### Decrypt telegram token manually
@@ -69,25 +69,25 @@ sudo age -d -i /root/.config/sops/age/keys.txt ~/.secrets/telegram-bot-token.enc
 ### Edit encrypted config (decrypt → edit → re-encrypt)
 ```bash
 sudo SOPS_AGE_KEY_FILE=/root/.config/sops/age/keys.txt \
-  sops ~/.clawdbot/clawdbot.json.enc
+  sops ~/.openclaw/openclaw.json.enc
 ```
 
 ### Re-encrypt after manual changes
 ```bash
 # If you edited the decrypted .json directly:
 AGE_PUB="age10jj52pql3htczwt6c39v598vwjgxayaemweq2c7t5p4gp996549sq9p9c5"
-sops -e --age $AGE_PUB ~/.clawdbot/clawdbot.json > ~/.clawdbot/clawdbot.json.enc
+sops -e --age $AGE_PUB ~/.openclaw/openclaw.json > ~/.openclaw/openclaw.json.enc
 ```
 
-### Restart clawdbot
+### Restart openclaw
 ```bash
-sudo systemctl restart clawdbot
-sudo systemctl status clawdbot
+sudo systemctl restart openclaw
+sudo systemctl status openclaw
 ```
 
 ## Startup Script
 
-`/usr/local/bin/clawdbot-start.sh`:
+`/usr/local/bin/openclaw-start.sh`:
 ```bash
 #!/bin/bash
 set -e
@@ -95,14 +95,14 @@ set -e
 SOPS_AGE_KEY_FILE=/root/.config/sops/age/keys.txt
 export SOPS_AGE_KEY_FILE
 
-CONFIG_DIR=/home/fx/.clawdbot
+CONFIG_DIR=/home/fx/.openclaw
 SECRETS_DIR=/home/fx/.secrets
 
-# Decrypt clawdbot.json
-if [ -f "$CONFIG_DIR/clawdbot.json.enc" ]; then
-  sops -d --output-type json "$CONFIG_DIR/clawdbot.json.enc" > "$CONFIG_DIR/clawdbot.json"
-  chown fx:fx "$CONFIG_DIR/clawdbot.json"
-  chmod 600 "$CONFIG_DIR/clawdbot.json"
+# Decrypt openclaw.json
+if [ -f "$CONFIG_DIR/openclaw.json.enc" ]; then
+  sops -d --output-type json "$CONFIG_DIR/openclaw.json.enc" > "$CONFIG_DIR/openclaw.json"
+  chown fx:fx "$CONFIG_DIR/openclaw.json"
+  chmod 600 "$CONFIG_DIR/openclaw.json"
 fi
 
 # Decrypt telegram token
@@ -113,13 +113,13 @@ if [ -f "$SECRETS_DIR/telegram-bot-token.enc" ]; then
   chmod 600 "$SECRETS_DIR/telegram-bot-token"
 fi
 
-# Run clawdbot as fx user
-exec sudo -u fx /home/fx/.local/share/npm-global/bin/clawdbot gateway start
+# Run openclaw as fx user
+exec sudo -u fx /home/fx/.local/share/npm-global/bin/openclaw gateway start
 ```
 
 ## Systemd Service
 
-`/etc/systemd/system/clawdbot.service`:
+`/etc/systemd/system/openclaw.service`:
 ```ini
 [Unit]
 Description=Clawdbot Gateway
@@ -127,7 +127,7 @@ After=network.target
 
 [Service]
 Type=simple
-ExecStart=/usr/local/bin/clawdbot-start.sh
+ExecStart=/usr/local/bin/openclaw-start.sh
 Restart=always
 RestartSec=5
 
@@ -140,17 +140,17 @@ WantedBy=multi-user.target
 ### Clawdbot won't start after reboot
 1. Check if decryption worked:
    ```bash
-   ls -la ~/.clawdbot/clawdbot.json
+   ls -la ~/.openclaw/openclaw.json
    ls -la ~/.secrets/telegram-bot-token
    ```
 2. Check systemd logs:
    ```bash
-   sudo journalctl -u clawdbot -n 50
+   sudo journalctl -u openclaw -n 50
    ```
 3. Try manual decrypt:
    ```bash
    sudo SOPS_AGE_KEY_FILE=/root/.config/sops/age/keys.txt \
-     sops -d --output-type json ~/.clawdbot/clawdbot.json.enc
+     sops -d --output-type json ~/.openclaw/openclaw.json.enc
    ```
 
 ### Lost the age private key
@@ -166,7 +166,7 @@ WantedBy=multi-user.target
 1. Edit the encrypted file directly:
    ```bash
    sudo SOPS_AGE_KEY_FILE=/root/.config/sops/age/keys.txt \
-     sops ~/.clawdbot/clawdbot.json.enc
+     sops ~/.openclaw/openclaw.json.enc
    ```
    This decrypts, opens in $EDITOR, and re-encrypts on save.
 

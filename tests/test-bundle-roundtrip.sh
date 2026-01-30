@@ -67,7 +67,7 @@ setup_test_env() {
 
     mkdir -p "${TEST_DIR}/source"
     mkdir -p "${TEST_DIR}/target"
-    mkdir -p "${TEST_DIR}/home/fx/.clawdbot"
+    mkdir -p "${TEST_DIR}/home/fx/.openclaw"
     mkdir -p "${TEST_DIR}/home/fx/.secrets"
     mkdir -p "${TEST_DIR}/home/fx/.config/gh"
     mkdir -p "${TEST_DIR}/home/fx/.config/rclone"
@@ -88,20 +88,20 @@ create_mock_secrets() {
     local pub_key
     pub_key=$(grep "public key:" "${TEST_DIR}/root/.config/sops/age/keys.txt" | cut -d: -f2 | tr -d ' ')
 
-    # Create mock clawdbot.json.enc (fake SOPS file - just encrypted JSON for testing)
-    log_info "Creating mock clawdbot config"
-    cat > "${TEST_DIR}/home/fx/.clawdbot/clawdbot.json.plaintext" <<'EOF'
+    # Create mock openclaw.json.enc (fake SOPS file - just encrypted JSON for testing)
+    log_info "Creating mock openclaw config"
+    cat > "${TEST_DIR}/home/fx/.openclaw/openclaw.json.plaintext" <<'EOF'
 {
     "telegramBotToken": "123456789:ABCdefGHIjklMNOpqrsTUVwxyz",
     "openaiApiKey": "sk-test-key-1234567890"
 }
 EOF
-    age -r "$pub_key" -o "${TEST_DIR}/home/fx/.clawdbot/clawdbot.json.enc" \
-        "${TEST_DIR}/home/fx/.clawdbot/clawdbot.json.plaintext"
-    rm "${TEST_DIR}/home/fx/.clawdbot/clawdbot.json.plaintext"
+    age -r "$pub_key" -o "${TEST_DIR}/home/fx/.openclaw/openclaw.json.enc" \
+        "${TEST_DIR}/home/fx/.openclaw/openclaw.json.plaintext"
+    rm "${TEST_DIR}/home/fx/.openclaw/openclaw.json.plaintext"
 
     # Create .sops.yaml
-    cat > "${TEST_DIR}/home/fx/.clawdbot/.sops.yaml" <<EOF
+    cat > "${TEST_DIR}/home/fx/.openclaw/.sops.yaml" <<EOF
 creation_rules:
   - age: $pub_key
 EOF
@@ -156,14 +156,14 @@ mkdir -p "${STAGING}"/{age,sops,secrets,credentials,sops-config}
 # Copy AGE key
 cp "$AGE_KEY_FILE" "${STAGING}/age/keys.txt"
 
-# Copy clawdbot config
-if [[ -f "${USER_HOME}/.clawdbot/clawdbot.json.enc" ]]; then
-    cp "${USER_HOME}/.clawdbot/clawdbot.json.enc" "${STAGING}/sops/"
+# Copy openclaw config
+if [[ -f "${USER_HOME}/.openclaw/openclaw.json.enc" ]]; then
+    cp "${USER_HOME}/.openclaw/openclaw.json.enc" "${STAGING}/sops/"
 fi
 
 # Copy .sops.yaml
-if [[ -f "${USER_HOME}/.clawdbot/.sops.yaml" ]]; then
-    cp "${USER_HOME}/.clawdbot/.sops.yaml" "${STAGING}/sops-config/"
+if [[ -f "${USER_HOME}/.openclaw/.sops.yaml" ]]; then
+    cp "${USER_HOME}/.openclaw/.sops.yaml" "${STAGING}/sops-config/"
 fi
 
 # Copy encrypted secrets
@@ -301,7 +301,7 @@ run_import() {
     # Verify specific files exist
     local expected_files=(
         "age/keys.txt"
-        "sops/clawdbot.json.enc"
+        "sops/openclaw.json.enc"
         "sops-config/.sops.yaml"
         "secrets/telegram-bot-token.enc"
         "credentials/gh-hosts.yml.enc"

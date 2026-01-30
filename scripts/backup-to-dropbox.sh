@@ -1,12 +1,12 @@
 #!/bin/bash
 # backup-to-dropbox.sh - Nyx daily backup to Dropbox via rclone
 #
-# Syncs clawd workspace and clawdbot config to Dropbox. Sends Telegram
+# Syncs clawd workspace and openclaw config to Dropbox. Sends Telegram
 # notifications on success and failure. Runs at 3:00am daily.
 #
 # Prerequisites:
 #   - rclone configured with Dropbox remote named "dropbox"
-#   - Telegram bot token in ~/.clawdbot/runtime/telegram-bot-token
+#   - Telegram bot token in ~/.openclaw/runtime/telegram-bot-token
 #
 # Usage:
 #   ./backup-to-dropbox.sh              # Normal backup
@@ -19,7 +19,7 @@ set -euo pipefail
 # ============================================
 
 LOG_FILE="$HOME/backup.log"
-TELEGRAM_TOKEN_FILE="$HOME/.clawdbot/runtime/telegram-bot-token"
+TELEGRAM_TOKEN_FILE="$HOME/.openclaw/runtime/telegram-bot-token"
 TELEGRAM_CHAT_ID="8332440542"
 
 # Excludes for clawd
@@ -33,8 +33,8 @@ CLAWD_EXCLUDES=(
     ".pytest_cache/**"
 )
 
-# Excludes for clawdbot
-CLAWDBOT_EXCLUDES=(
+# Excludes for openclaw
+OPENCLAW_EXCLUDES=(
     "telegram/**"
     "agents/*/sessions/**"
     "runtime/**"
@@ -107,19 +107,19 @@ sync_clawd() {
     log "Clawd sync complete"
 }
 
-sync_clawdbot() {
-    local src="$HOME/.clawdbot/"
-    local dest="dropbox:nyx-backup/clawdbot/"
+sync_openclaw() {
+    local src="$HOME/.openclaw/"
+    local dest="dropbox:nyx-backup/openclaw/"
 
     if [[ ! -d "$src" ]]; then
         log "WARN: Source directory does not exist: $src"
         return 0
     fi
 
-    log "Syncing clawdbot to Dropbox..."
+    log "Syncing openclaw to Dropbox..."
 
     local rclone_opts="-q"
-    for exclude in "${CLAWDBOT_EXCLUDES[@]}"; do
+    for exclude in "${OPENCLAW_EXCLUDES[@]}"; do
         rclone_opts+=" --exclude=$exclude"
     done
 
@@ -130,7 +130,7 @@ sync_clawdbot() {
     # shellcheck disable=SC2086
     rclone sync "$src" "$dest" $rclone_opts 2>&1 | tee -a "$LOG_FILE"
 
-    log "Clawdbot sync complete"
+    log "Openclaw sync complete"
 }
 
 # ============================================
@@ -197,7 +197,7 @@ main() {
 
     # Run backups
     sync_clawd
-    sync_clawdbot
+    sync_openclaw
 
     log "Dropbox backup completed successfully"
     log "========================================"

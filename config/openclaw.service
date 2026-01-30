@@ -1,0 +1,33 @@
+# Openclaw Gateway System Service
+# Install to: /etc/systemd/system/openclaw.service
+#
+# Dependencies:
+#   - home-fx-.openclaw-runtime.mount (tmpfs for secrets)
+#   - /usr/local/bin/openclaw-start.sh (decrypt and start wrapper)
+#
+# Usage:
+#   sudo systemctl enable openclaw
+#   sudo systemctl start openclaw
+#   sudo journalctl -u openclaw -f
+
+[Unit]
+Description=Openclaw Gateway
+After=network.target home-fx-.openclaw-runtime.mount
+Requires=home-fx-.openclaw-runtime.mount
+
+[Service]
+Type=simple
+Environment="XDG_RUNTIME_DIR=/run/user/1000"
+Environment="DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus"
+ExecStart=/usr/local/bin/openclaw-start.sh
+Restart=always
+RestartSec=5
+# Security hardening
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/home/fx/.openclaw /home/fx/clawd
+PrivateTmp=true
+NoNewPrivileges=false
+
+[Install]
+WantedBy=multi-user.target

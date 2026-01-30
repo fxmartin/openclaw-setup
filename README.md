@@ -5,7 +5,7 @@
 
 ## Introduction
 
-Nyx is a self-hosted Telegram bot powered by [Clawd](https://github.com/clawdbot/clawdbot), an open-source AI agent framework created by [Peter Steinberger](https://github.com/steipete).
+Nyx is a self-hosted Telegram bot powered by [Clawd](https://github.com/openclaw/openclaw), an open-source AI agent framework created by [Peter Steinberger](https://github.com/steipete).
 
 I started experimenting with Clawd over the weekend when the hype around it began — and it's an amazing project. This repository documents my deployment setup for running my own instance.
 
@@ -17,14 +17,14 @@ I had a similar experience. I initially deployed Nyx on my dev VPS to experiment
 
 ### What is Clawd?
 
-[Clawd](https://github.com/clawdbot/clawdbot) is an autonomous AI agent that can:
+[Clawd](https://github.com/openclaw/openclaw) is an autonomous AI agent that can:
 - Interact via Telegram (and other platforms)
 - Maintain persistent memory across conversations
 - Execute skills and tools autonomously
 - Generate images via DALL-E
 - Run scheduled tasks and briefings
 
-For more information, see the [Clawd GitHub repository](https://github.com/clawdbot/clawdbot).
+For more information, see the [Clawd GitHub repository](https://github.com/openclaw/openclaw).
 
 ## What Nyx Can Do
 
@@ -37,7 +37,7 @@ See [docs/services-inventory.md](docs/services-inventory.md) for the full list.
 | Skill | Description |
 |-------|-------------|
 | 📊 **analyst-report** | Generate executive analyst reports on companies (PDF) |
-| 🔄 **auto-updater** | Daily auto-update for Clawdbot and skills via cron |
+| 🔄 **auto-updater** | Daily auto-update for Openclaw and skills via cron |
 | 🏦 **banking-sector-report** | Banking sector reports by country (PDF) |
 | 📈 **crypto-market** | Real-time cryptocurrency market data and forecasts |
 | ✈️ **flight-tracker** | Live flight tracking via OpenSky Network |
@@ -48,7 +48,7 @@ See [docs/services-inventory.md](docs/services-inventory.md) for the full list.
 | 📈 **portfolio-watcher** | Track stock/crypto holdings and alerts |
 | 👤 **professional-profile** | Research professional backgrounds |
 | ⏰ **remind-me** | Natural language reminders via cron |
-| 🧶 **skillcraft** | Create and package Clawdbot skills |
+| 🧶 **skillcraft** | Create and package Openclaw skills |
 
 **Bundled Skills (13 ready):**
 
@@ -81,7 +81,7 @@ See [docs/services-inventory.md](docs/services-inventory.md) for the full list.
 
 ### Automations
 
-- **Daily Auto-Update** - 4:00 AM CET (updates Clawdbot + skills)
+- **Daily Auto-Update** - 4:00 AM CET (updates Openclaw + skills)
 - **Birthday Reminders** - 40 contacts configured (annual + 1-week advance)
 - **Daily Briefings** - Morning news digest
 
@@ -114,32 +114,32 @@ Nyx is accessible via Telegram. The bot token is encrypted and decrypted at star
 | Component | Path |
 |-----------|------|
 | Installation | ~/clawd |
-| Config directory | ~/.clawdbot/ |
-| Binary | ~/.local/share/npm-global/bin/clawdbot |
-| System service | /etc/systemd/system/clawdbot.service |
-| Tmpfs mount unit | /etc/systemd/system/home-fx-.clawdbot-runtime.mount |
-| Start script | /usr/local/bin/clawdbot-start.sh |
+| Config directory | ~/.openclaw/ |
+| Binary | ~/.local/share/npm-global/bin/openclaw |
+| System service | /etc/systemd/system/openclaw.service |
+| Tmpfs mount unit | /etc/systemd/system/home-fx-.openclaw-runtime.mount |
+| Start script | /usr/local/bin/openclaw-start.sh |
 
 ### Version
 
-Clawdbot version: 2026.1.24-3
+Openclaw version: 2026.1.24-3
 
 ## Configuration
 
 ### Systemd Service
 
 ```ini
-# /etc/systemd/system/clawdbot.service
+# /etc/systemd/system/openclaw.service
 [Unit]
-Description=Clawdbot Gateway
-After=network.target home-fx-.clawdbot-runtime.mount
-Requires=home-fx-.clawdbot-runtime.mount
+Description=Openclaw Gateway
+After=network.target home-fx-.openclaw-runtime.mount
+Requires=home-fx-.openclaw-runtime.mount
 
 [Service]
 Type=simple
 Environment="XDG_RUNTIME_DIR=/run/user/1000"
 Environment="DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus"
-ExecStart=/usr/local/bin/clawdbot-start.sh
+ExecStart=/usr/local/bin/openclaw-start.sh
 Restart=always
 RestartSec=5
 
@@ -149,28 +149,28 @@ WantedBy=multi-user.target
 
 ### Start Script
 
-The start script (`/usr/local/bin/clawdbot-start.sh`):
-1. Mounts tmpfs at `~/.clawdbot/runtime/` if not already mounted
-2. Decrypts `clawdbot.json.enc` using SOPS → writes to tmpfs (RAM)
+The start script (`/usr/local/bin/openclaw-start.sh`):
+1. Mounts tmpfs at `~/.openclaw/runtime/` if not already mounted
+2. Decrypts `openclaw.json.enc` using SOPS → writes to tmpfs (RAM)
 3. Decrypts Telegram bot token using age → writes to tmpfs (RAM)
 4. Creates symlinks from original paths to tmpfs locations
-5. Runs clawdbot gateway as user `fx`
+5. Runs openclaw gateway as user `fx`
 
 ### Secrets Management (tmpfs + SOPS/AGE)
 
 See [docs/sops-age-setup.md](docs/sops-age-setup.md) for full details.
 
 **Encrypted sources (on disk):**
-- `~/.clawdbot/clawdbot.json.enc` - SOPS encrypted config
+- `~/.openclaw/openclaw.json.enc` - SOPS encrypted config
 - `~/.secrets/telegram-bot-token.enc` - AGE encrypted token
 
 **Decrypted at runtime (in RAM only):**
-- `~/.clawdbot/runtime/clawdbot.json` - tmpfs mount
-- `~/.clawdbot/runtime/telegram-bot-token` - tmpfs mount
+- `~/.openclaw/runtime/openclaw.json` - tmpfs mount
+- `~/.openclaw/runtime/telegram-bot-token` - tmpfs mount
 
 **Symlinks (for compatibility):**
-- `~/.clawdbot/clawdbot.json` → `runtime/clawdbot.json`
-- `~/.secrets/telegram-bot-token` → `~/.clawdbot/runtime/telegram-bot-token`
+- `~/.openclaw/openclaw.json` → `runtime/openclaw.json`
+- `~/.secrets/telegram-bot-token` → `~/.openclaw/runtime/telegram-bot-token`
 
 This ensures secrets are **never written to disk** after decryption and are automatically wiped on reboot.
 
@@ -196,10 +196,10 @@ This ensures secrets are **never written to disk** after decryption and are auto
 ├── skills/
 └── .venv/
 
-/home/fx/.clawdbot/
+/home/fx/.openclaw/
 ├── agents/
-├── clawdbot.json → runtime/clawdbot.json (symlink)
-├── clawdbot.json.enc (encrypted source)
+├── openclaw.json → runtime/openclaw.json (symlink)
+├── openclaw.json.enc (encrypted source)
 ├── credentials/
 ├── cron/
 ├── devices/
@@ -207,7 +207,7 @@ This ensures secrets are **never written to disk** after decryption and are auto
 ├── media/
 ├── memory/
 ├── runtime/ (tmpfs - RAM only)
-│   ├── clawdbot.json (decrypted)
+│   ├── openclaw.json (decrypted)
 │   └── telegram-bot-token (decrypted)
 ├── subagents/
 ├── telegram/
@@ -220,16 +220,16 @@ This ensures secrets are **never written to disk** after decryption and are auto
 
 ```bash
 # Check status
-sudo systemctl status clawdbot
+sudo systemctl status openclaw
 
 # View logs
-sudo journalctl -u clawdbot -f
+sudo journalctl -u openclaw -f
 
 # Restart service
-sudo systemctl restart clawdbot
+sudo systemctl restart openclaw
 
 # Stop service
-sudo systemctl stop clawdbot
+sudo systemctl stop openclaw
 ```
 
 ### SSH Access
@@ -242,13 +242,13 @@ ssh nyx
 ## Architecture
 
 ```
-Boot → systemd starts tmpfs mount → clawdbot.service starts
+Boot → systemd starts tmpfs mount → openclaw.service starts
                 ↓
-    clawdbot-start.sh (decrypts to tmpfs as root)
+    openclaw-start.sh (decrypts to tmpfs as root)
                 ↓
     Secrets in RAM only (symlinked to original paths)
                 ↓
-    clawdbot gateway start (as user fx)
+    openclaw gateway start (as user fx)
 ```
 
 The service runs without D-Bus warnings thanks to:
@@ -289,25 +289,25 @@ net.ipv4.conf.all.accept_source_route = 0
 Implemented RAM-only storage for decrypted secrets:
 
 ```
-BEFORE: sops decrypt → disk file → clawdbot reads → file persists on disk
+BEFORE: sops decrypt → disk file → openclaw reads → file persists on disk
                                                     ↓
                                           Recoverable via disk forensics
 
-AFTER:  sops decrypt → tmpfs (RAM) → symlink → clawdbot reads
+AFTER:  sops decrypt → tmpfs (RAM) → symlink → openclaw reads
                           ↓
                     Reboot = secrets wiped
                     No disk forensics possible
 ```
 
-**Systemd mount unit** (`/etc/systemd/system/home-fx-.clawdbot-runtime.mount`):
+**Systemd mount unit** (`/etc/systemd/system/home-fx-.openclaw-runtime.mount`):
 ```ini
 [Unit]
-Description=Clawdbot Runtime Secrets (tmpfs)
-Before=clawdbot.service
+Description=Openclaw Runtime Secrets (tmpfs)
+Before=openclaw.service
 
 [Mount]
 What=tmpfs
-Where=/home/fx/.clawdbot/runtime
+Where=/home/fx/.openclaw/runtime
 Type=tmpfs
 Options=nodev,nosuid,noexec,size=2M,uid=1000,gid=1000,mode=0700
 
@@ -319,7 +319,7 @@ WantedBy=multi-user.target
 
 - **Public internet**: Only SSH (protected by Fail2ban)
 - **Tailscale**: Primary access method
-- **Clawdbot ports**: Bound to localhost only (127.0.0.1:18789, 18791, 18792)
+- **Openclaw ports**: Bound to localhost only (127.0.0.1:18789, 18791, 18792)
 - **SMTP**: Port 25 explicitly blocked
 
 ### Verification Commands
@@ -329,10 +329,10 @@ WantedBy=multi-user.target
 mount | grep runtime
 
 # Verify symlinks
-ls -la ~/.clawdbot/clawdbot.json ~/.secrets/telegram-bot-token
+ls -la ~/.openclaw/openclaw.json ~/.secrets/telegram-bot-token
 
 # Check no plaintext on disk
-find ~/.clawdbot -maxdepth 1 -name '*.json' -type f
+find ~/.openclaw -maxdepth 1 -name '*.json' -type f
 
 # Check fail2ban status
 sudo fail2ban-client status sshd
@@ -373,7 +373,7 @@ nyx-secrets-bundle/
 ├── age/
 │   └── keys.txt                # AGE private key (master key)
 ├── sops/
-│   └── clawdbot.json.enc       # SOPS-encrypted config
+│   └── openclaw.json.enc       # SOPS-encrypted config
 ├── secrets/
 │   └── telegram-bot-token.enc  # AGE-encrypted token
 ├── credentials/
@@ -418,7 +418,7 @@ sudo ./provision/nyx-import-secrets.sh --bundle /tmp/bundle.tar.gz.age
 | 2. Base Config | Create fx user, SSH keys, hostname |
 | 3. Security | UFW, Fail2ban, SSH hardening, rkhunter |
 | 4. Secrets | Upload & import secrets bundle |
-| 5. Software | Node.js 22, clawdbot, sops, age, gh, rclone |
+| 5. Software | Node.js 22, openclaw, sops, age, gh, rclone |
 | 6. Service | Systemd service, tmpfs mount, decrypt scripts |
 | 7. Workspace | Restore ~/clawd/ from Dropbox |
 | 8. Tailscale | Install & connect |
@@ -455,7 +455,7 @@ sudo ./provision/nyx-import-secrets.sh --bundle /tmp/bundle.tar.gz.age
 ### Repository Structure
 
 ```
-moltbot-setup/
+openclaw-setup/
 ├── provision/
 │   ├── nyx-export-bundle.sh       # Export from local (recommended)
 │   ├── nyx-provision.sh           # Main entry point
@@ -465,14 +465,14 @@ moltbot-setup/
 │   └── lib/
 │       └── logging.sh             # Logging utilities
 ├── config/
-│   ├── clawdbot.service           # Systemd service
-│   ├── clawdbot-runtime.mount     # tmpfs mount unit
-│   ├── clawdbot-start.sh          # Start script
-│   ├── clawdbot-decrypt.sh        # Decrypt wrapper
+│   ├── openclaw.service           # Systemd service
+│   ├── openclaw-runtime.mount     # tmpfs mount unit
+│   ├── openclaw-start.sh          # Start script
+│   ├── openclaw-decrypt.sh        # Decrypt wrapper
 │   ├── sops-decrypt-config        # SOPS helper
 │   ├── age-decrypt-token          # AGE helper
 │   └── sudoers.d/
-│       └── clawdbot-decrypt       # NOPASSWD rules
+│       └── openclaw-decrypt       # NOPASSWD rules
 ├── scripts/
 │   ├── backup-to-nas.sh           # NAS backup via rsync
 │   └── setup-nas-backup.sh        # NAS backup setup helper
@@ -504,7 +504,7 @@ Daily at 3:00am via `rclone`:
 ### 2. NAS Backup (Secondary)
 
 Daily at 3:30am via rsync daemon over Tailscale:
-- Syncs `~/clawd/` and `~/.clawdbot/` to Terramaster F8 SSD NAS
+- Syncs `~/clawd/` and `~/.openclaw/` to Terramaster F8 SSD NAS
 - Script: `/home/fx/backup-to-nas.sh`
 - Telegram alert on failure
 
@@ -514,7 +514,7 @@ Daily at 3:30am via rsync daemon over Tailscale:
 | Rsync Port | 873 |
 | Rsync User | rsync-user |
 | Rsync Module | Backup |
-| Backup Paths | `nyx/clawd/`, `nyx/clawdbot/` |
+| Backup Paths | `nyx/clawd/`, `nyx/openclaw/` |
 
 ### Setup NAS Backup
 

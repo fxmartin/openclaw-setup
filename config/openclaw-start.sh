@@ -1,24 +1,24 @@
 #!/bin/bash
-# clawdbot-start.sh - Start script for clawdbot gateway
-# Install to: /usr/local/bin/clawdbot-start.sh (root:root 755)
+# openclaw-start.sh - Start script for openclaw gateway
+# Install to: /usr/local/bin/openclaw-start.sh (root:root 755)
 #
 # This script:
 #   1. Ensures tmpfs is mounted for runtime secrets
 #   2. Decrypts secrets to tmpfs (RAM only)
 #   3. Creates symlinks for compatibility
-#   4. Starts clawdbot gateway as user fx
+#   4. Starts openclaw gateway as user fx
 #
-# Called by: /etc/systemd/system/clawdbot.service
+# Called by: /etc/systemd/system/openclaw.service
 
 set -e
 
 USER="fx"
 USER_HOME="/home/$USER"
-CLAWDBOT_DIR="$USER_HOME/.clawdbot"
+OPENCLAW_DIR="$USER_HOME/.openclaw"
 SECRETS_DIR="$USER_HOME/.secrets"
-RUNTIME_DIR="$CLAWDBOT_DIR/runtime"
+RUNTIME_DIR="$OPENCLAW_DIR/runtime"
 AGE_KEY="/root/.config/sops/age/keys.txt"
-CLAWDBOT_BIN="$USER_HOME/.local/share/npm-global/bin/clawdbot"
+OPENCLAW_BIN="$USER_HOME/.local/share/npm-global/bin/openclaw"
 
 log() {
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"
@@ -31,7 +31,7 @@ error() {
 
 # Verify prerequisites
 [[ -f "$AGE_KEY" ]] || error "AGE key not found: $AGE_KEY"
-[[ -d "$CLAWDBOT_DIR" ]] || error "Clawdbot directory not found: $CLAWDBOT_DIR"
+[[ -d "$OPENCLAW_DIR" ]] || error "Openclaw directory not found: $OPENCLAW_DIR"
 
 # Ensure runtime directory exists
 mkdir -p "$RUNTIME_DIR"
@@ -42,18 +42,18 @@ if ! mountpoint -q "$RUNTIME_DIR"; then
     mount -t tmpfs -o nodev,nosuid,noexec,size=2M,uid=1000,gid=1000,mode=0700 tmpfs "$RUNTIME_DIR"
 fi
 
-# Decrypt clawdbot.json.enc if exists
-if [[ -f "$CLAWDBOT_DIR/clawdbot.json.enc" ]]; then
-    log "Decrypting clawdbot.json.enc to tmpfs"
+# Decrypt openclaw.json.enc if exists
+if [[ -f "$OPENCLAW_DIR/openclaw.json.enc" ]]; then
+    log "Decrypting openclaw.json.enc to tmpfs"
     SOPS_AGE_KEY_FILE="$AGE_KEY" sops -d --output-type json \
-        "$CLAWDBOT_DIR/clawdbot.json.enc" > "$RUNTIME_DIR/clawdbot.json"
-    chown "$USER:$USER" "$RUNTIME_DIR/clawdbot.json"
-    chmod 600 "$RUNTIME_DIR/clawdbot.json"
+        "$OPENCLAW_DIR/openclaw.json.enc" > "$RUNTIME_DIR/openclaw.json"
+    chown "$USER:$USER" "$RUNTIME_DIR/openclaw.json"
+    chmod 600 "$RUNTIME_DIR/openclaw.json"
 
     # Create symlink if not exists
-    if [[ ! -L "$CLAWDBOT_DIR/clawdbot.json" ]]; then
-        rm -f "$CLAWDBOT_DIR/clawdbot.json"
-        ln -sf "runtime/clawdbot.json" "$CLAWDBOT_DIR/clawdbot.json"
+    if [[ ! -L "$OPENCLAW_DIR/openclaw.json" ]]; then
+        rm -f "$OPENCLAW_DIR/openclaw.json"
+        ln -sf "runtime/openclaw.json" "$OPENCLAW_DIR/openclaw.json"
     fi
 fi
 
@@ -71,7 +71,7 @@ if [[ -f "$SECRETS_DIR/telegram-bot-token.enc" ]]; then
     fi
 fi
 
-log "Starting clawdbot gateway as user $USER"
+log "Starting openclaw gateway as user $USER"
 
 # Run as user fx with proper environment
 exec su - "$USER" -c "
@@ -79,5 +79,5 @@ exec su - "$USER" -c "
     export XDG_RUNTIME_DIR=/run/user/1000
     export DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus
     cd $USER_HOME/clawd
-    $CLAWDBOT_BIN gateway start
+    $OPENCLAW_BIN gateway start
 "

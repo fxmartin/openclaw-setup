@@ -148,15 +148,15 @@ verify_sops() {
     fi
 
     # Check encrypted config exists
-    if run_check "test -f ${TARGET_HOME}/.clawdbot/clawdbot.json.enc"; then
+    if run_check "test -f ${TARGET_HOME}/.openclaw/openclaw.json.enc"; then
         check_pass "Encrypted config exists"
     else
-        check_fail "Encrypted config not found: ${TARGET_HOME}/.clawdbot/clawdbot.json.enc"
+        check_fail "Encrypted config not found: ${TARGET_HOME}/.openclaw/openclaw.json.enc"
         return
     fi
 
     # Try to decrypt (verify key works)
-    if run_check "sudo SOPS_AGE_KEY_FILE=/root/.config/sops/age/keys.txt sops -d ${TARGET_HOME}/.clawdbot/clawdbot.json.enc >/dev/null 2>&1"; then
+    if run_check "sudo SOPS_AGE_KEY_FILE=/root/.config/sops/age/keys.txt sops -d ${TARGET_HOME}/.openclaw/openclaw.json.enc >/dev/null 2>&1"; then
         check_pass "SOPS can decrypt config"
     else
         check_fail "SOPS cannot decrypt config (key mismatch?)"
@@ -166,10 +166,10 @@ verify_sops() {
 verify_tmpfs() {
     log_step "tmpfs Mount (Runtime Secrets)"
 
-    local runtime_dir="${TARGET_HOME}/.clawdbot/runtime"
+    local runtime_dir="${TARGET_HOME}/.openclaw/runtime"
 
     # Check if mount unit exists
-    if run_check "test -f /etc/systemd/system/home-fx-.clawdbot-runtime.mount"; then
+    if run_check "test -f /etc/systemd/system/home-fx-.openclaw-runtime.mount"; then
         check_pass "tmpfs mount unit exists"
     else
         check_warn "tmpfs mount unit not found (may use inline mounting)"
@@ -189,11 +189,11 @@ verify_tmpfs() {
     fi
 }
 
-verify_clawdbot_service() {
-    log_step "Clawdbot Service"
+verify_openclaw_service() {
+    log_step "Openclaw Service"
 
     # Check service file exists
-    if run_check "test -f /etc/systemd/system/clawdbot.service"; then
+    if run_check "test -f /etc/systemd/system/openclaw.service"; then
         check_pass "Service file exists"
     else
         check_fail "Service file not found"
@@ -202,7 +202,7 @@ verify_clawdbot_service() {
 
     # Check service status
     local status
-    status=$(run_check "systemctl is-active clawdbot.service 2>/dev/null" || true)
+    status=$(run_check "systemctl is-active openclaw.service 2>/dev/null" || true)
 
     case "$status" in
         active)
@@ -220,7 +220,7 @@ verify_clawdbot_service() {
     esac
 
     # Check if enabled
-    if run_check "systemctl is-enabled clawdbot.service &>/dev/null"; then
+    if run_check "systemctl is-enabled openclaw.service &>/dev/null"; then
         check_pass "Service is enabled (will start on boot)"
     else
         check_warn "Service is not enabled"
@@ -338,13 +338,13 @@ verify_software() {
         check_fail "Node.js not installed"
     fi
 
-    # clawdbot
-    if run_check "su - $TARGET_USER -c 'command -v clawdbot' &>/dev/null"; then
+    # openclaw
+    if run_check "su - $TARGET_USER -c 'command -v openclaw' &>/dev/null"; then
         local version
-        version=$(run_check "su - $TARGET_USER -c 'clawdbot --version 2>/dev/null'" || echo "unknown")
-        check_pass "clawdbot installed: $version"
+        version=$(run_check "su - $TARGET_USER -c 'openclaw --version 2>/dev/null'" || echo "unknown")
+        check_pass "openclaw installed: $version"
     else
-        check_fail "clawdbot not installed"
+        check_fail "openclaw not installed"
     fi
 
     # age
@@ -428,7 +428,7 @@ main() {
     verify_age_key
     verify_sops
     verify_tmpfs
-    verify_clawdbot_service
+    verify_openclaw_service
     verify_dropbox
     verify_tailscale
     verify_security

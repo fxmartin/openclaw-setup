@@ -8,7 +8,7 @@
 # Prerequisites:
 #   - rkhunter installed
 #   - fail2ban installed
-#   - Telegram bot token in ~/.clawdbot/runtime/telegram-bot-token
+#   - Telegram bot token in ~/.openclaw/runtime/telegram-bot-token
 #
 # Usage:
 #   ./security-scan.sh              # Run full scan
@@ -21,7 +21,7 @@ set -euo pipefail
 # ============================================
 
 LOG_FILE="$HOME/security-scan.log"
-TELEGRAM_TOKEN_FILE="$HOME/.clawdbot/runtime/telegram-bot-token"
+TELEGRAM_TOKEN_FILE="$HOME/.openclaw/runtime/telegram-bot-token"
 TELEGRAM_CHAT_ID="8332440542"
 
 # ============================================

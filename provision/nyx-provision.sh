@@ -209,7 +209,7 @@ LOCAL_SSH_KEY=""
 create_ssh_key() {
     log_step "Setting up SSH key for $SERVER_NAME"
 
-    local key_name="moltbot-${SERVER_NAME}"
+    local key_name="openclaw-${SERVER_NAME}"
     local key_path="$HOME/.ssh/id_${SERVER_NAME}"
 
     # Check if local key already exists
@@ -223,7 +223,7 @@ create_ssh_key() {
         fi
     else
         log_substep "Generating new SSH key pair"
-        ssh-keygen -t ed25519 -f "$key_path" -N "" -C "${SERVER_NAME}@moltbot"
+        ssh-keygen -t ed25519 -f "$key_path" -N "" -C "${SERVER_NAME}@openclaw"
         chmod 600 "$key_path"
         LOCAL_SSH_KEY="$key_path"
         log_success "SSH key created: $key_path"
@@ -541,7 +541,7 @@ install_software() {
 
     if [[ $DRY_RUN -eq 1 ]]; then
         log_info "[DRY-RUN] Would install packages from config/nyx-packages.txt"
-        log_info "[DRY-RUN] Would install: Node.js 22, sops, gh, rclone, clawdbot"
+        log_info "[DRY-RUN] Would install: Node.js 22, sops, gh, rclone, openclaw"
         return 0
     fi
 
@@ -605,11 +605,11 @@ su - "$TARGET_USER" -c "
     echo 'export PATH=~/.local/share/npm-global/bin:\$PATH' >> ~/.bashrc
 "
 
-echo "==> Installing clawdbot globally..."
+echo "==> Installing openclaw globally..."
 su - "$TARGET_USER" -c "
     export PATH=~/.local/share/npm-global/bin:\$PATH
-    npm install -g clawdbot
-    clawdbot --version || echo 'clawdbot installed'
+    npm install -g openclaw
+    openclaw --version || echo 'openclaw installed'
 "
 
 echo "Software installation complete"
@@ -623,7 +623,7 @@ SCRIPT
 # ============================================
 
 configure_service() {
-    log_step "Configuring clawdbot service"
+    log_step "Configuring openclaw service"
 
     if [[ $DRY_RUN -eq 1 ]]; then
         log_info "[DRY-RUN] Would configure: systemd service, tmpfs mount, decrypt scripts"
@@ -633,13 +633,12 @@ configure_service() {
     # Copy config files
     log_substep "Uploading service configurations"
     remote_exec "mkdir -p /tmp/nyx-setup/config/sudoers.d"
-    remote_copy "${REPO_DIR}/config/clawdbot.service" "/tmp/nyx-setup/config/"
-    remote_copy "${REPO_DIR}/config/clawdbot-runtime.mount" "/tmp/nyx-setup/config/"
-    remote_copy "${REPO_DIR}/config/clawdbot-start.sh" "/tmp/nyx-setup/config/"
-    remote_copy "${REPO_DIR}/config/clawdbot-decrypt.sh" "/tmp/nyx-setup/config/"
+    remote_copy "${REPO_DIR}/config/openclaw.service" "/tmp/nyx-setup/config/"
+    remote_copy "${REPO_DIR}/config/openclaw-runtime.mount" "/tmp/nyx-setup/config/"
+    remote_copy "${REPO_DIR}/config/openclaw-start.sh" "/tmp/nyx-setup/config/"
+    remote_copy "${REPO_DIR}/config/openclaw-decrypt.sh" "/tmp/nyx-setup/config/"
     remote_copy "${REPO_DIR}/config/sops-decrypt-config" "/tmp/nyx-setup/config/"
-    remote_copy "${REPO_DIR}/config/age-decrypt-token" "/tmp/nyx-setup/config/"
-    remote_copy "${REPO_DIR}/config/sudoers.d/clawdbot-decrypt" "/tmp/nyx-setup/config/sudoers.d/"
+    remote_copy "${REPO_DIR}/config/sudoers.d/openclaw-decrypt" "/tmp/nyx-setup/config/sudoers.d/"
 
     remote_exec "bash -s" <<'SCRIPT'
 set -e
@@ -649,34 +648,32 @@ TARGET_HOME="/home/$TARGET_USER"
 CONFIG_DIR="/tmp/nyx-setup/config"
 
 echo "==> Installing systemd service..."
-cp "$CONFIG_DIR/clawdbot.service" /etc/systemd/system/
-cp "$CONFIG_DIR/clawdbot-runtime.mount" /etc/systemd/system/home-fx-.clawdbot-runtime.mount
+cp "$CONFIG_DIR/openclaw.service" /etc/systemd/system/
+cp "$CONFIG_DIR/openclaw-runtime.mount" /etc/systemd/system/home-fx-.openclaw-runtime.mount
 
 echo "==> Installing helper scripts..."
-cp "$CONFIG_DIR/clawdbot-start.sh" /usr/local/bin/
-cp "$CONFIG_DIR/clawdbot-decrypt.sh" /usr/local/bin/
+cp "$CONFIG_DIR/openclaw-start.sh" /usr/local/bin/
+cp "$CONFIG_DIR/openclaw-decrypt.sh" /usr/local/bin/
 cp "$CONFIG_DIR/sops-decrypt-config" /usr/local/bin/
-cp "$CONFIG_DIR/age-decrypt-token" /usr/local/bin/
 
-chmod 755 /usr/local/bin/clawdbot-*.sh
+chmod 755 /usr/local/bin/openclaw-*.sh
 chmod 755 /usr/local/bin/sops-decrypt-config
-chmod 755 /usr/local/bin/age-decrypt-token
 
 echo "==> Installing sudoers rules..."
-cp "$CONFIG_DIR/sudoers.d/clawdbot-decrypt" /etc/sudoers.d/
-chmod 440 /etc/sudoers.d/clawdbot-decrypt
+cp "$CONFIG_DIR/sudoers.d/openclaw-decrypt" /etc/sudoers.d/
+chmod 440 /etc/sudoers.d/openclaw-decrypt
 
 # Validate sudoers
-if ! visudo -cf /etc/sudoers.d/clawdbot-decrypt; then
+if ! visudo -cf /etc/sudoers.d/openclaw-decrypt; then
     echo "ERROR: Invalid sudoers configuration"
-    rm -f /etc/sudoers.d/clawdbot-decrypt
+    rm -f /etc/sudoers.d/openclaw-decrypt
     exit 1
 fi
 
 echo "==> Creating required directories..."
-mkdir -p "$TARGET_HOME/.clawdbot/runtime"
+mkdir -p "$TARGET_HOME/.openclaw/runtime"
 mkdir -p "$TARGET_HOME/.secrets"
-chown -R "$TARGET_USER:$TARGET_USER" "$TARGET_HOME/.clawdbot" "$TARGET_HOME/.secrets"
+chown -R "$TARGET_USER:$TARGET_USER" "$TARGET_HOME/.openclaw" "$TARGET_HOME/.secrets"
 
 echo "==> Enabling user lingering..."
 loginctl enable-linger "$TARGET_USER"
@@ -685,8 +682,8 @@ echo "==> Reloading systemd..."
 systemctl daemon-reload
 
 echo "==> Enabling services..."
-systemctl enable home-fx-.clawdbot-runtime.mount
-systemctl enable clawdbot.service
+systemctl enable home-fx-.openclaw-runtime.mount
+systemctl enable openclaw.service
 
 echo "Service configuration complete"
 SCRIPT
@@ -904,7 +901,7 @@ SCRIPT
 update_ssh_config() {
     local tailscale_ip="${1:-}"
     local config_dir="$HOME/.ssh/config.d"
-    local config_file="$config_dir/moltbot-servers"
+    local config_file="$config_dir/openclaw-servers"
 
     log_step "Updating local SSH config"
 
@@ -989,12 +986,12 @@ final_steps() {
     fi
 
     # Start services
-    log_substep "Starting clawdbot service"
-    remote_exec "systemctl start clawdbot.service || true"
+    log_substep "Starting openclaw service"
+    remote_exec "systemctl start openclaw.service || true"
 
     # Check status
     log_substep "Checking service status"
-    remote_exec "systemctl status clawdbot.service --no-pager || true"
+    remote_exec "systemctl status openclaw.service --no-pager || true"
 
     # Apply SSH hardening (now that fx user is fully set up)
     log_substep "Applying SSH hardening"
@@ -1036,7 +1033,7 @@ SCRIPT
 update_ssh_config_standalone() {
     local server_name="$1"
     local key_path="$HOME/.ssh/id_${server_name}"
-    local config_file="$HOME/.ssh/config.d/moltbot-servers"
+    local config_file="$HOME/.ssh/config.d/openclaw-servers"
 
     log_step "Fetching Tailscale IP for $server_name"
 
