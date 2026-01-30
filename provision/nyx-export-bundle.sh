@@ -213,10 +213,16 @@ echo "  [+] AGE private key" >&2
 # Get public key for encryption
 pub_key=$(grep "public key:" "$AGE_KEY_FILE" | cut -d: -f2 | tr -d ' ')
 
-# 2. Openclaw config
+# 2. Openclaw config (check both new and legacy names)
 if [[ -f "${USER_HOME}/.openclaw/openclaw.json.enc" ]]; then
     cp "${USER_HOME}/.openclaw/openclaw.json.enc" "${STAGING}/sops/"
     echo "  [+] openclaw.json.enc" >&2
+elif [[ -f "${USER_HOME}/.clawdbot/clawdbot.json.enc" ]]; then
+    # Legacy naming: export as openclaw for consistency
+    cp "${USER_HOME}/.clawdbot/clawdbot.json.enc" "${STAGING}/sops/openclaw.json.enc"
+    echo "  [+] clawdbot.json.enc → openclaw.json.enc (migrated)" >&2
+else
+    echo "  [!] WARNING: No config file found (checked .openclaw and .clawdbot)" >&2
 fi
 
 # 3. SOPS config
@@ -429,9 +435,13 @@ if [[ -f "$AGE_KEY_FILE" ]]; then
     echo "  age/keys.txt (AGE private key)"
 fi
 
-# Openclaw config
+# Openclaw config (check both new and legacy names)
 if [[ -f "${USER_HOME}/.openclaw/openclaw.json.enc" ]]; then
     echo "  sops/openclaw.json.enc"
+elif [[ -f "${USER_HOME}/.clawdbot/clawdbot.json.enc" ]]; then
+    echo "  sops/openclaw.json.enc (from clawdbot.json.enc - migrated)"
+else
+    echo "  [!] No config found (checked .openclaw and .clawdbot)"
 fi
 
 # SOPS config
