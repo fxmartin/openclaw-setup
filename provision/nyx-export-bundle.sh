@@ -34,13 +34,17 @@ log_error() { echo -e "${RED}[ERROR]${NC} $*" >&2; }
 log_success() { echo -e "${GREEN}[OK]${NC} $*"; }
 
 # Default values
-NYX_HOST="nyx"
+NYX_HOST="fx@100.64.138.99"
+SSH_KEY="$HOME/.ssh/id_nyx"
 OUTPUT_FILE="${REPO_DIR}/nyx-secrets-bundle.tar.gz.age"
 PASSPHRASE=""
 DRY_RUN=0
 GENERATE_PASSPHRASE=1
 TARGET_USER="fx"
 TARGET_HOME="/home/fx"
+
+# SSH options (built in check_prerequisites)
+SSH_OPTS=""
 
 # Temp files to clean up
 TEMP_FILES=()
@@ -50,7 +54,8 @@ cleanup() {
         [[ -f "$f" ]] && rm -f "$f"
     done
     # Clean up on remote
-    ssh "$NYX_HOST" "sudo rm -f /tmp/nyx-secrets-export-*.tar.gz" 2>/dev/null || true
+    # shellcheck disable=SC2086
+    ssh $SSH_OPTS "$NYX_HOST" "sudo rm -f /tmp/nyx-secrets-export-*.tar.gz" 2>/dev/null || true
 }
 trap cleanup EXIT
 
@@ -61,7 +66,8 @@ Usage: $(basename "$0") [OPTIONS]
 Export secrets bundle from Nyx server.
 
 OPTIONS:
-    -H, --host HOST         SSH host (default: nyx)
+    -H, --host HOST         SSH host (default: fx@100.64.138.99)
+    -i, --identity FILE     SSH identity file (default: ~/.ssh/id_nyx)
     -o, --output FILE       Output file (default: ./nyx-secrets-bundle.tar.gz.age)
     -p, --passphrase PASS   Use specific passphrase (default: generate random)
     -n, --dry-run           Show what would be exported without creating bundle
@@ -100,6 +106,10 @@ parse_args() {
                 NYX_HOST="$2"
                 shift 2
                 ;;
+            -i|--identity)
+                SSH_KEY="$2"
+                shift 2
+                ;;
             -o|--output)
                 OUTPUT_FILE="$2"
                 shift 2
@@ -129,8 +139,16 @@ parse_args() {
 check_prerequisites() {
     log_step "Checking prerequisites"
 
+    # Build SSH options
+    SSH_OPTS="-o ConnectTimeout=5 -o BatchMode=yes -o StrictHostKeyChecking=accept-new"
+    if [[ -f "$SSH_KEY" ]]; then
+        SSH_OPTS="$SSH_OPTS -i $SSH_KEY"
+        log_info "Using SSH key: $SSH_KEY"
+    fi
+
     # Check SSH connectivity
-    if ! ssh -o ConnectTimeout=5 -o BatchMode=yes "$NYX_HOST" "echo ok" &>/dev/null; then
+    # shellcheck disable=SC2086
+    if ! ssh $SSH_OPTS "$NYX_HOST" "echo ok" &>/dev/null; then
         log_error "Cannot connect to $NYX_HOST via SSH"
         log_error "Make sure Tailscale is connected or SSH is configured"
         exit 1
@@ -151,7 +169,8 @@ check_prerequisites() {
     fi
 
     # Check remote prerequisites
-    ssh "$NYX_HOST" "sudo test -f /root/.config/sops/age/keys.txt" || {
+    # shellcheck disable=SC2086
+    ssh $SSH_OPTS "$NYX_HOST" "sudo test -f /root/.config/sops/age/keys.txt" || {
         log_error "AGE key not found on $NYX_HOST"
         exit 1
     }
@@ -171,7 +190,8 @@ collect_secrets_on_remote() {
     timestamp=$(date +%s)
     local remote_tarball="/tmp/nyx-secrets-export-${timestamp}.tar.gz"
 
-    ssh "$NYX_HOST" "sudo bash -s '$remote_tarball' '$TARGET_HOME'" << 'REMOTE_SCRIPT'
+    # shellcheck disable=SC2086
+    ssh $SSH_OPTS "$NYX_HOST" "sudo bash -s '$remote_tarball' '$TARGET_HOME'" << 'REMOTE_SCRIPT'
 set -euo pipefail
 
 OUTPUT_FILE="$1"
@@ -228,7 +248,13 @@ if [[ -f "${USER_HOME}/.config/rclone/rclone.conf" ]]; then
     echo "  [+] rclone.conf.enc (encrypted)" >&2
 fi
 
-# 7. Additional credentials from clawdbot
+# 7. NAS rsync password (encrypt if exists)
+if [[ -f "${USER_HOME}/.rsync-nas-password" ]]; then
+    age -r "$pub_key" -o "${STAGING}/credentials/rsync-nas-password.enc" "${USER_HOME}/.rsync-nas-password"
+    echo "  [+] rsync-nas-password.enc (encrypted)" >&2
+fi
+
+# 8. Additional credentials from clawdbot
 shopt -s nullglob
 for cred_file in "${USER_HOME}/.clawdbot/credentials"/*.enc; do
     if [[ -f "$cred_file" ]]; then
@@ -285,11 +311,19 @@ copy_and_encrypt() {
 
     log_step "Copying tarball from $NYX_HOST"
 
-    scp "$NYX_HOST:$remote_tarball" "$local_tarball"
+    # Build scp options from SSH_OPTS
+    local scp_opts=""
+    if [[ -f "$SSH_KEY" ]]; then
+        scp_opts="-i $SSH_KEY"
+    fi
+
+    # shellcheck disable=SC2086
+    scp $scp_opts "$NYX_HOST:$remote_tarball" "$local_tarball"
     log_success "Copied $(du -h "$local_tarball" | cut -f1) tarball"
 
     # Clean up remote immediately
-    ssh "$NYX_HOST" "sudo rm -f $remote_tarball"
+    # shellcheck disable=SC2086
+    ssh $SSH_OPTS "$NYX_HOST" "sudo rm -f $remote_tarball"
 
     log_step "Encrypting bundle with AGE"
 
@@ -379,7 +413,8 @@ verify_bundle() {
 dry_run() {
     log_step "Dry run - showing what would be exported"
 
-    ssh "$NYX_HOST" "sudo bash -s" << 'REMOTE_SCRIPT'
+    # shellcheck disable=SC2086
+    ssh $SSH_OPTS "$NYX_HOST" "sudo bash -s" << 'REMOTE_SCRIPT'
 set -euo pipefail
 
 USER_HOME="/home/fx"
@@ -419,6 +454,11 @@ fi
 # rclone config
 if [[ -f "${USER_HOME}/.config/rclone/rclone.conf" ]]; then
     echo "  credentials/rclone.conf.enc (will be encrypted)"
+fi
+
+# NAS rsync password
+if [[ -f "${USER_HOME}/.rsync-nas-password" ]]; then
+    echo "  credentials/rsync-nas-password.enc (will be encrypted)"
 fi
 
 # Additional credentials
