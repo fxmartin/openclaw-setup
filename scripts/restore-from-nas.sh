@@ -204,6 +204,13 @@ restore_openclaw() {
 
     log "Restoring openclaw from NAS..."
 
+    # Check if source exists on NAS first
+    if ! rsync --list-only --password-file="$RSYNC_PASSWORD_FILE" "$src" &>/dev/null; then
+        log "WARN: openclaw backup not found on NAS (nyx/openclaw/) - skipping"
+        log "This is normal for first-time setup; config will be created by secrets import"
+        return 0
+    fi
+
     local rsync_opts="-avz --password-file=$RSYNC_PASSWORD_FILE"
 
     for exclude in "${OPENCLAW_EXCLUDES[@]}"; do

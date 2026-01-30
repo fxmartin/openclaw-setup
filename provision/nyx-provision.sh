@@ -488,13 +488,16 @@ import_secrets() {
     fi
 
     # Install prerequisites for secrets import
-    log_substep "Installing prerequisites (age, jq)"
+    log_substep "Installing prerequisites (age, jq, expect)"
     remote_exec "bash -s" <<'SCRIPT'
-# Install jq if missing
-if ! command -v jq &>/dev/null; then
-    echo "Installing jq..."
-    apt-get update -qq && apt-get install -y -qq jq
-fi
+# Install jq and expect if missing
+apt-get update -qq
+for pkg in jq expect; do
+    if ! command -v $pkg &>/dev/null; then
+        echo "Installing $pkg..."
+        apt-get install -y -qq $pkg
+    fi
+done
 
 # Install age if missing
 if ! command -v age &>/dev/null; then
@@ -508,6 +511,7 @@ fi
 
 echo "jq: $(jq --version)"
 echo "age: $(age --version)"
+echo "expect: $(expect -v)"
 SCRIPT
 
     # Copy import script and bundle
@@ -884,6 +888,7 @@ setup_tailscale() {
         return 0
     fi
 
+    # Install Tailscale
     remote_exec "bash -s" <<'SCRIPT'
 set -e
 
@@ -895,20 +900,61 @@ fi
 echo "==> Starting Tailscale..."
 systemctl enable tailscaled
 systemctl start tailscaled
-
-# Check if already authenticated
-if tailscale status &>/dev/null; then
-    echo "Tailscale already connected:"
-    tailscale status
-else
-    echo ""
-    echo "=========================================="
-    echo "Tailscale needs authentication!"
-    echo "Run on the server: tailscale up"
-    echo "=========================================="
-    echo ""
-fi
 SCRIPT
+
+    # Check if already authenticated
+    if remote_exec "tailscale status &>/dev/null"; then
+        log_success "Tailscale already connected"
+        remote_exec "tailscale status"
+        return 0
+    fi
+
+    # For NAS restore, we MUST have Tailscale authenticated
+    if [[ "$RESTORE_SOURCE" == "nas" ]]; then
+        log_warn "Tailscale authentication required for NAS restore"
+        echo ""
+        echo "════════════════════════════════════════════════════════════"
+        echo "  TAILSCALE AUTHENTICATION REQUIRED"
+        echo "════════════════════════════════════════════════════════════"
+        echo ""
+        echo "  Open a NEW terminal and run:"
+        echo ""
+        echo "    ssh ${SERVER_NAME}-root 'tailscale up'"
+        echo ""
+        echo "  Complete the authentication in your browser, then return here."
+        echo ""
+        echo "════════════════════════════════════════════════════════════"
+        echo ""
+
+        # Wait for user to authenticate
+        log_substep "Waiting for Tailscale authentication..."
+        local max_wait=300  # 5 minutes
+        local waited=0
+        local interval=5
+
+        while [[ $waited -lt $max_wait ]]; do
+            if remote_exec "tailscale status &>/dev/null" 2>/dev/null; then
+                echo ""
+                log_success "Tailscale connected!"
+                remote_exec "tailscale status"
+                return 0
+            fi
+            sleep $interval
+            ((waited += interval))
+            echo -n "."
+        done
+
+        echo ""
+        log_fatal "Timeout waiting for Tailscale authentication. NAS restore requires Tailscale."
+    else
+        # Non-NAS restore: just inform the user
+        echo ""
+        echo "=========================================="
+        echo "Tailscale needs authentication!"
+        echo "Run on the server: tailscale up"
+        echo "=========================================="
+        echo ""
+    fi
 
     log_success "Tailscale setup complete"
 }
@@ -1256,8 +1302,17 @@ main() {
     import_secrets
     install_software
     configure_service
-    restore_workspace
-    setup_tailscale
+
+    # For NAS restore, Tailscale must be set up BEFORE workspace restore
+    # (NAS is only reachable via Tailscale network)
+    if [[ "$RESTORE_SOURCE" == "nas" ]]; then
+        setup_tailscale
+        restore_workspace
+    else
+        restore_workspace
+        setup_tailscale
+    fi
+
     setup_backups
     final_steps
 

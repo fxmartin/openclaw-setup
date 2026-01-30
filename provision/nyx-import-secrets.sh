@@ -139,11 +139,28 @@ extract_bundle() {
     fi
 
     if [[ -n "$PASSPHRASE" ]]; then
-        # Use provided passphrase (non-interactive)
-        log_debug "Using provided passphrase"
-        if ! echo "$PASSPHRASE" | age -d -o "$temp_tar" "$bundle" 2>/dev/null; then
-            rm -f "$temp_tar"
-            log_fatal "Failed to decrypt bundle (wrong passphrase?)"
+        # Use provided passphrase (non-interactive) via expect
+        log_debug "Using provided passphrase via expect"
+        if command -v expect &>/dev/null; then
+            if ! expect -c "
+                log_user 0
+                set timeout 30
+                spawn age -d -o \"$temp_tar\" \"$bundle\"
+                expect \"Enter passphrase:\"
+                send \"$PASSPHRASE\r\"
+                expect eof
+                catch wait result
+                exit [lindex \$result 3]
+            " 2>/dev/null; then
+                rm -f "$temp_tar"
+                log_fatal "Failed to decrypt bundle (wrong passphrase?)"
+            fi
+        else
+            # Fallback: try direct pipe (may not work with all age versions)
+            if ! echo "$PASSPHRASE" | age -d -o "$temp_tar" "$bundle" 2>/dev/null; then
+                rm -f "$temp_tar"
+                log_fatal "Failed to decrypt bundle (wrong passphrase?). Install 'expect' for better compatibility."
+            fi
         fi
     else
         # Interactive prompt
@@ -199,7 +216,7 @@ verify_manifest() {
 
         if [[ ! -f "$file_path" ]]; then
             log_error "Missing file: $path"
-            ((failed++))
+            ((++failed)) || true
             continue
         fi
 
@@ -208,10 +225,10 @@ verify_manifest() {
 
         if [[ "$checksum" != "$actual_checksum" ]]; then
             log_error "Checksum mismatch: $path"
-            ((failed++))
+            ((++failed)) || true
         else
             log_debug "Verified: $path"
-            ((verified++))
+            ((++verified)) || true
         fi
     done < <(jq -c '.files[]' "$manifest")
 
@@ -300,7 +317,7 @@ install_secrets() {
             chown "${target_uid}:${target_gid}" "${secrets_dir}/${filename}"
             chmod 644 "${secrets_dir}/${filename}"
             log_debug "  Installed: $filename"
-            ((secret_count++))
+            ((++secret_count)) || true
         fi
     done
     shopt -u nullglob

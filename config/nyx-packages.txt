@@ -19,11 +19,10 @@ rkhunter
 ufw
 
 # Development tools
-age
+# age - installed from GitHub releases (not in apt)
+# sops - installed from GitHub releases (not in apt)
 gh
 git
-nodejs
-sops
 
 # Media/Document processing
 ffmpeg
