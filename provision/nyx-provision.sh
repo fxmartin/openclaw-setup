@@ -672,7 +672,70 @@ SCRIPT
 }
 
 # ============================================
-# Phase 9: Final Steps
+# Phase 9: NAS Backup Setup
+# ============================================
+
+setup_nas_backup() {
+    log_step "Setting up NAS backup"
+
+    if [[ $DRY_RUN -eq 1 ]]; then
+        log_info "[DRY-RUN] Would configure NAS backup via rsync"
+        return 0
+    fi
+
+    # Copy backup script
+    log_substep "Uploading backup script"
+    remote_copy "${REPO_DIR}/scripts/backup-to-nas.sh" "/tmp/nyx-setup/"
+
+    remote_exec "bash -s" <<'SCRIPT'
+set -e
+
+TARGET_USER="fx"
+TARGET_HOME="/home/$TARGET_USER"
+BACKUP_SCRIPT="/tmp/nyx-setup/backup-to-nas.sh"
+
+echo "==> Installing NAS backup script..."
+if [[ -f "$BACKUP_SCRIPT" ]]; then
+    cp "$BACKUP_SCRIPT" "${TARGET_HOME}/backup-to-nas.sh"
+    chmod 755 "${TARGET_HOME}/backup-to-nas.sh"
+    chown "${TARGET_USER}:${TARGET_USER}" "${TARGET_HOME}/backup-to-nas.sh"
+    echo "Installed: ${TARGET_HOME}/backup-to-nas.sh"
+else
+    echo "WARN: Backup script not found, skipping"
+    exit 0
+fi
+
+echo "==> Checking rsync password file..."
+if [[ ! -f "${TARGET_HOME}/.rsync-nas-password" ]]; then
+    echo "WARN: rsync password file not found at ${TARGET_HOME}/.rsync-nas-password"
+    echo "NAS backup will need manual configuration"
+    exit 0
+fi
+
+echo "==> Setting up cron job..."
+# Get existing crontab
+existing_cron=$(crontab -u "$TARGET_USER" -l 2>/dev/null || true)
+
+# Check if backup job already exists
+if echo "$existing_cron" | grep -q "backup-to-nas.sh"; then
+    echo "NAS backup cron job already exists"
+else
+    # Add new cron job (3:30am daily, 30 mins after Dropbox backup)
+    (echo "$existing_cron"; echo "30 3 * * * ${TARGET_HOME}/backup-to-nas.sh") | crontab -u "$TARGET_USER" -
+    echo "Added cron job: 30 3 * * * ${TARGET_HOME}/backup-to-nas.sh"
+fi
+
+echo "==> Verifying crontab..."
+crontab -u "$TARGET_USER" -l
+
+echo "NAS backup setup complete"
+SCRIPT
+
+    log_success "NAS backup configured"
+}
+
+# ============================================
+# Phase 10: Final Steps
 # ============================================
 
 final_steps() {
@@ -734,6 +797,7 @@ main() {
     configure_service
     restore_workspace
     setup_tailscale
+    setup_nas_backup
     final_steps
 
     separator

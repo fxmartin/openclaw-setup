@@ -76,7 +76,8 @@ See [docs/services-inventory.md](docs/services-inventory.md) for the full list.
 - **Google Workspace** - Gmail, Calendar, Drive
 - **GitHub** - CLI access via `gh`
 - **Hetzner Cloud** - Server management
-- **Dropbox** - Backup
+- **Dropbox** - Backup (daily at 3am)
+- **Terramaster NAS** - Backup via Tailscale rsync (daily at 3:30am)
 
 ### Automations
 
@@ -421,6 +422,7 @@ sudo ./provision/nyx-import-secrets.sh --bundle /tmp/bundle.tar.gz.age
 | 6. Service | Systemd service, tmpfs mount, decrypt scripts |
 | 7. Workspace | Restore ~/clawd/ from Dropbox |
 | 8. Tailscale | Install & connect |
+| 9. NAS Backup | Install backup script, configure cron |
 
 ### Verification
 
@@ -471,6 +473,9 @@ moltbot-setup/
 │   ├── age-decrypt-token          # AGE helper
 │   └── sudoers.d/
 │       └── clawdbot-decrypt       # NOPASSWD rules
+├── scripts/
+│   ├── backup-to-nas.sh           # NAS backup via rsync
+│   └── setup-nas-backup.sh        # NAS backup setup helper
 ├── security/
 │   ├── setup-security.sh          # Security installer
 │   ├── ufw-setup.sh               # Firewall setup
@@ -484,6 +489,80 @@ moltbot-setup/
 │   └── services-inventory.md      # Skills inventory
 └── assets/
     └── images/
+```
+
+## Backup Strategy
+
+Nyx uses a dual-backup strategy for redundancy:
+
+### 1. Dropbox Backup (Primary)
+
+Daily at 3:00am via `rclone`:
+- Syncs `~/clawd/` to `dropbox:nyx-backup/clawd/`
+- Script: `/home/fx/backup-to-dropbox.sh`
+
+### 2. NAS Backup (Secondary)
+
+Daily at 3:30am via rsync daemon over Tailscale:
+- Syncs `~/clawd/` and `~/.clawdbot/` to Terramaster F8 SSD NAS
+- Script: `/home/fx/backup-to-nas.sh`
+- Telegram alert on failure
+
+| Setting | Value |
+|---------|-------|
+| NAS IP | 100.98.9.111 (Tailscale) |
+| Rsync Port | 873 |
+| Rsync User | rsync-user |
+| Rsync Module | Backup |
+| Backup Paths | `nyx/clawd/`, `nyx/clawdbot/` |
+
+### Setup NAS Backup
+
+```bash
+# Copy scripts to Nyx
+scp scripts/backup-to-nas.sh scripts/setup-nas-backup.sh nyx:/tmp/
+
+# Run setup on Nyx (as root)
+ssh nyx 'sudo bash /tmp/setup-nas-backup.sh'
+
+# Or manual setup:
+# 1. Create password file
+echo "RSYNC_PASSWORD" > ~/.rsync-nas-password
+chmod 600 ~/.rsync-nas-password
+
+# 2. Install backup script
+cp /tmp/backup-to-nas.sh ~/backup-to-nas.sh
+chmod +x ~/backup-to-nas.sh
+
+# 3. Test connectivity
+~/backup-to-nas.sh --test
+
+# 4. Add cron job
+(crontab -l; echo "30 3 * * * /home/fx/backup-to-nas.sh") | crontab -
+```
+
+### Backup Verification
+
+```bash
+# Check crontab
+crontab -l
+
+# View backup logs
+cat ~/backup-nas.log
+
+# Test backup (dry-run)
+~/backup-to-nas.sh --dry-run
+
+# Run backup manually
+~/backup-to-nas.sh
+```
+
+### Expected Crontab
+
+```
+0 3 * * * /home/fx/backup-to-dropbox.sh
+30 3 * * * /home/fx/backup-to-nas.sh
+0 4 * * 0 /home/fx/security-scan.sh
 ```
 
 ## License

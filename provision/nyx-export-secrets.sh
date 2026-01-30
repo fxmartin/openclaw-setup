@@ -184,7 +184,21 @@ collect_files() {
         log_warn "  Not found: rclone config"
     fi
 
-    # 7. Additional email configs if present
+    # 7. rsync NAS password
+    log_substep "rsync NAS password"
+    local rsync_password="${USER_HOME}/.rsync-nas-password"
+    if [[ -f "$rsync_password" ]]; then
+        # Encrypt with AGE
+        log_substep "  Encrypting rsync-nas-password"
+        local pub_key
+        pub_key=$(grep "public key:" "$AGE_KEY_FILE" | cut -d: -f2 | tr -d ' ')
+        age -r "$pub_key" -o "${staging_dir}/credentials/rsync-nas-password.enc" "$rsync_password"
+        log_success "  Collected: rsync NAS password"
+    else
+        log_warn "  Not found: rsync NAS password"
+    fi
+
+    # 8. Additional email configs if present
     log_substep "Email configs"
     local email_count=0
     shopt -s nullglob

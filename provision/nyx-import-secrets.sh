@@ -257,7 +257,8 @@ install_secrets() {
     chown "${target_uid}:${target_gid}" "$secrets_dir"
 
     local secret_count=0
-    for enc_file in "${staging_dir}/secrets/"*.enc 2>/dev/null; do
+    shopt -s nullglob
+    for enc_file in "${staging_dir}/secrets/"*.enc; do
         if [[ -f "$enc_file" ]]; then
             local filename
             filename=$(basename "$enc_file")
@@ -268,6 +269,7 @@ install_secrets() {
             ((secret_count++))
         fi
     done
+    shopt -u nullglob
     log_success "  Installed: $secret_count secret files"
 
     # 5. Install GitHub CLI credentials
@@ -313,6 +315,23 @@ install_secrets() {
             chown "${target_uid}:${target_gid}" "${rclone_dir}/rclone.conf.enc"
             log_warn "  Installed encrypted: rclone.conf.enc (decrypt manually)"
         fi
+    fi
+
+    # 7. Install rsync NAS password
+    log_substep "rsync NAS password"
+    if [[ -f "${staging_dir}/credentials/rsync-nas-password.enc" ]]; then
+        # Decrypt with AGE and install
+        if age -d -i "${AGE_KEY_DIR}/keys.txt" \
+            -o "${TARGET_HOME}/.rsync-nas-password" \
+            "${staging_dir}/credentials/rsync-nas-password.enc" 2>/dev/null; then
+            chown "${target_uid}:${target_gid}" "${TARGET_HOME}/.rsync-nas-password"
+            chmod 600 "${TARGET_HOME}/.rsync-nas-password"
+            log_success "  Installed: rsync NAS password (decrypted)"
+        else
+            log_warn "  Failed to decrypt rsync NAS password"
+        fi
+    else
+        log_warn "  Not found in bundle: rsync-nas-password.enc"
     fi
 
     log_success "Secrets installation complete"
