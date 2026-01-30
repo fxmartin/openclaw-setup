@@ -432,15 +432,31 @@ install_software() {
     log_step "Installing software stack"
 
     if [[ $DRY_RUN -eq 1 ]]; then
-        log_info "[DRY-RUN] Would install: Node.js 22, npm, sops, gh, rclone"
+        log_info "[DRY-RUN] Would install packages from config/nyx-packages.txt"
+        log_info "[DRY-RUN] Would install: Node.js 22, sops, gh, rclone, clawdbot"
         return 0
     fi
+
+    # Upload packages list
+    log_substep "Uploading package list"
+    remote_copy "${REPO_DIR}/config/nyx-packages.txt" "/tmp/nyx-setup/"
 
     remote_exec "bash -s" <<'SCRIPT'
 set -e
 
 TARGET_USER="fx"
 TARGET_HOME="/home/$TARGET_USER"
+PACKAGES_FILE="/tmp/nyx-setup/nyx-packages.txt"
+
+echo "==> Installing apt packages from config..."
+if [[ -f "$PACKAGES_FILE" ]]; then
+    # Filter out comments and blank lines, install packages
+    grep -vE '^\s*#|^\s*$' "$PACKAGES_FILE" | xargs apt-get install -y -qq
+    echo "Installed packages from nyx-packages.txt"
+else
+    echo "WARN: Package list not found, installing defaults..."
+    apt-get install -y -qq curl jq git fail2ban ufw rkhunter ffmpeg pandoc rsync
+fi
 
 echo "==> Installing Node.js 22..."
 if ! command -v node &>/dev/null; then
@@ -672,66 +688,104 @@ SCRIPT
 }
 
 # ============================================
-# Phase 9: NAS Backup Setup
+# Phase 9: Backup Scripts & Cron Setup
 # ============================================
 
-setup_nas_backup() {
-    log_step "Setting up NAS backup"
+setup_backups() {
+    log_step "Setting up backup scripts and cron jobs"
 
     if [[ $DRY_RUN -eq 1 ]]; then
-        log_info "[DRY-RUN] Would configure NAS backup via rsync"
+        log_info "[DRY-RUN] Would configure: Dropbox backup, NAS backup, security scan"
+        log_info "[DRY-RUN] Cron jobs: 3:00am Dropbox, 3:30am NAS, 4:00am Sunday security"
         return 0
     fi
 
-    # Copy backup script
-    log_substep "Uploading backup script"
+    # Copy all backup scripts
+    log_substep "Uploading backup and security scripts"
+    remote_copy "${REPO_DIR}/scripts/backup-to-dropbox.sh" "/tmp/nyx-setup/"
     remote_copy "${REPO_DIR}/scripts/backup-to-nas.sh" "/tmp/nyx-setup/"
+    remote_copy "${REPO_DIR}/scripts/security-scan.sh" "/tmp/nyx-setup/"
 
     remote_exec "bash -s" <<'SCRIPT'
 set -e
 
 TARGET_USER="fx"
 TARGET_HOME="/home/$TARGET_USER"
-BACKUP_SCRIPT="/tmp/nyx-setup/backup-to-nas.sh"
 
-echo "==> Installing NAS backup script..."
-if [[ -f "$BACKUP_SCRIPT" ]]; then
-    cp "$BACKUP_SCRIPT" "${TARGET_HOME}/backup-to-nas.sh"
+echo "==> Installing backup and security scripts..."
+
+# Install Dropbox backup script
+if [[ -f "/tmp/nyx-setup/backup-to-dropbox.sh" ]]; then
+    cp "/tmp/nyx-setup/backup-to-dropbox.sh" "${TARGET_HOME}/backup-to-dropbox.sh"
+    chmod 755 "${TARGET_HOME}/backup-to-dropbox.sh"
+    chown "${TARGET_USER}:${TARGET_USER}" "${TARGET_HOME}/backup-to-dropbox.sh"
+    echo "Installed: ${TARGET_HOME}/backup-to-dropbox.sh"
+fi
+
+# Install NAS backup script
+if [[ -f "/tmp/nyx-setup/backup-to-nas.sh" ]]; then
+    cp "/tmp/nyx-setup/backup-to-nas.sh" "${TARGET_HOME}/backup-to-nas.sh"
     chmod 755 "${TARGET_HOME}/backup-to-nas.sh"
     chown "${TARGET_USER}:${TARGET_USER}" "${TARGET_HOME}/backup-to-nas.sh"
     echo "Installed: ${TARGET_HOME}/backup-to-nas.sh"
-else
-    echo "WARN: Backup script not found, skipping"
-    exit 0
 fi
 
-echo "==> Checking rsync password file..."
+# Install security scan script
+if [[ -f "/tmp/nyx-setup/security-scan.sh" ]]; then
+    cp "/tmp/nyx-setup/security-scan.sh" "${TARGET_HOME}/security-scan.sh"
+    chmod 755 "${TARGET_HOME}/security-scan.sh"
+    chown "${TARGET_USER}:${TARGET_USER}" "${TARGET_HOME}/security-scan.sh"
+    echo "Installed: ${TARGET_HOME}/security-scan.sh"
+fi
+
+echo "==> Checking prerequisites..."
+# Check rsync password file for NAS backup
 if [[ ! -f "${TARGET_HOME}/.rsync-nas-password" ]]; then
     echo "WARN: rsync password file not found at ${TARGET_HOME}/.rsync-nas-password"
     echo "NAS backup will need manual configuration"
-    exit 0
 fi
 
-echo "==> Setting up cron job..."
+echo "==> Setting up cron jobs..."
 # Get existing crontab
 existing_cron=$(crontab -u "$TARGET_USER" -l 2>/dev/null || true)
 
-# Check if backup job already exists
-if echo "$existing_cron" | grep -q "backup-to-nas.sh"; then
-    echo "NAS backup cron job already exists"
+# Build new crontab
+new_cron="$existing_cron"
+
+# Add Dropbox backup (3:00am daily)
+if ! echo "$existing_cron" | grep -q "backup-to-dropbox.sh"; then
+    new_cron=$(echo "$new_cron"; echo "0 3 * * * ${TARGET_HOME}/backup-to-dropbox.sh")
+    echo "Adding: 0 3 * * * ${TARGET_HOME}/backup-to-dropbox.sh"
 else
-    # Add new cron job (3:30am daily, 30 mins after Dropbox backup)
-    (echo "$existing_cron"; echo "30 3 * * * ${TARGET_HOME}/backup-to-nas.sh") | crontab -u "$TARGET_USER" -
-    echo "Added cron job: 30 3 * * * ${TARGET_HOME}/backup-to-nas.sh"
+    echo "Dropbox backup cron already exists"
 fi
+
+# Add NAS backup (3:30am daily)
+if ! echo "$existing_cron" | grep -q "backup-to-nas.sh"; then
+    new_cron=$(echo "$new_cron"; echo "30 3 * * * ${TARGET_HOME}/backup-to-nas.sh")
+    echo "Adding: 30 3 * * * ${TARGET_HOME}/backup-to-nas.sh"
+else
+    echo "NAS backup cron already exists"
+fi
+
+# Add security scan (4:00am every Sunday)
+if ! echo "$existing_cron" | grep -q "security-scan.sh"; then
+    new_cron=$(echo "$new_cron"; echo "0 4 * * 0 ${TARGET_HOME}/security-scan.sh")
+    echo "Adding: 0 4 * * 0 ${TARGET_HOME}/security-scan.sh"
+else
+    echo "Security scan cron already exists"
+fi
+
+# Apply new crontab (filter out blank lines)
+echo "$new_cron" | grep -v '^$' | crontab -u "$TARGET_USER" -
 
 echo "==> Verifying crontab..."
 crontab -u "$TARGET_USER" -l
 
-echo "NAS backup setup complete"
+echo "Backup and security setup complete"
 SCRIPT
 
-    log_success "NAS backup configured"
+    log_success "Backup scripts and cron jobs configured"
 }
 
 # ============================================
@@ -797,7 +851,7 @@ main() {
     configure_service
     restore_workspace
     setup_tailscale
-    setup_nas_backup
+    setup_backups
     final_steps
 
     separator

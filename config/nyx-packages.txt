@@ -1,0 +1,33 @@
+# nyx-packages.txt - Packages to install on Nyx server
+# Managed by sync-packages.sh
+#
+# Categories:
+#   - System utilities
+#   - Security tools
+#   - Development tools
+#   - Media processing
+
+# System utilities
+curl
+jq
+netcat-openbsd
+rsync
+
+# Security tools
+fail2ban
+rkhunter
+ufw
+
+# Development tools
+age
+gh
+git
+nodejs
+sops
+
+# Media/Document processing
+ffmpeg
+pandoc
+
+# Backup tools
+rclone
