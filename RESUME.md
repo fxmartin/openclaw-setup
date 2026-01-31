@@ -26,11 +26,11 @@
 
 | Issue | Description | Status |
 |-------|-------------|--------|
-| Naming mismatch | Prod uses `clawdbot`, DR uses `openclaw` | Needs standardization |
-| NAS backup path | Was only `clawdbot/`, restore looks for `openclaw/` | Fixed - copied to `openclaw/` |
-| Missing state on DR | Cron jobs, memory DB, auth profiles not restored | Manually copied (not via provisioning) |
-| No SOPS/AGE on DR | DR didn't use proper secrets decryption flow | Needs reprovisioning |
-| Backup script bug | References `~/.openclaw/` but prod has `~/.clawdbot/` | Needs fix |
+| Naming mismatch | Prod uses `clawdbot`, DR uses `openclaw` | Needs Phase 2 |
+| NAS backup path | Was only `clawdbot/`, restore looks for `openclaw/` | ✅ Fixed |
+| Missing state on DR | Cron jobs, memory DB, auth profiles not restored | ✅ Fixed (--restore-from-nas) |
+| No SOPS/AGE on DR | DR didn't use proper secrets decryption flow | ✅ Fixed (E2E test) |
+| Backup script bug | References `~/.openclaw/` but prod has `~/.clawdbot/` | Needs Phase 2 |
 
 ### What Was Restored via NAS (--restore-from-nas)
 All state now restored automatically via provisioning script:
@@ -42,19 +42,13 @@ All state now restored automatically via provisioning script:
 
 ---
 
-## Plan for Tomorrow
+## Progress
 
-### Phase 0: Add INSTALLED.md Parsing to Provisioning Script
+### Phase 0: Add INSTALLED.md Parsing to Provisioning Script - COMPLETED
 
 **Goal**: Auto-install packages that Nyx installed after initial provisioning
 
-Add function to `provision/nyx-provision.sh`:
-```bash
-install_tracked_packages() {
-    local installed_md="$TARGET_HOME/clawd/INSTALLED.md"
-    # Parse markdown table, install packages by method
-}
-```
+**Implementation**: `install_tracked_packages()` function in `provision/nyx-provision.sh` (line 939)
 
 **Method mapping:**
 | INSTALLED.md Method | Install Command |
@@ -66,11 +60,6 @@ install_tracked_packages() {
 | `cargo` | `cargo install` |
 | `brew` | `brew install` |
 | `—` | skip (baseline) |
-
-**Current INSTALLED.md content:**
-```
-| 2026-01-30 | weasyprint | pip (uv) | PDF generation from HTML/CSS |
-```
 
 ---
 
@@ -101,25 +90,28 @@ install_tracked_packages() {
 4. Verification script fixed for remote execution (Tailscale hostname resolution)
 5. Verification script counter bug fixed (`|| true` for arithmetic)
 
-### Phase 2: Recreate Production nyx
+### Phase 2: Recreate Production nyx - PENDING
 
 **Goal**: Both servers identical, created by same process
 
 ```bash
 # 1. Stop nyx-dr first (avoid Telegram conflict)
-ssh -i ~/.ssh/id_nyx-dr fx@100.109.120.109 'systemctl --user stop openclaw-gateway'
+ssh nyx-dr 'sudo systemctl stop openclaw'
 
 # 2. Export fresh backup from prod to NAS
-ssh -i ~/.ssh/id_nyx fx@100.64.138.99 '~/backup-to-nas.sh'
+ssh nyx '~/backup-to-nas.sh'
 
-# 3. Delete nyx server from Hetzner console
+# 3. Delete nyx server from Hetzner
+hcloud server delete nyx
 
 # 4. Provision new nyx
 ./provision/nyx-provision.sh \
+  --server-name nyx \
   --secrets-bundle ~/nyx-secrets-bundle.tar.gz.age \
   --restore-from-nas
 
 # 5. Verify and switch traffic to new nyx
+./provision/nyx-verify.sh --remote nyx
 ```
 
 ### Phase 3: Expected End State
