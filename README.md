@@ -5,26 +5,26 @@
 
 ## Introduction
 
-Nyx is a self-hosted Telegram bot powered by [Clawd](https://github.com/openclaw/openclaw), an open-source AI agent framework created by [Peter Steinberger](https://github.com/steipete).
+Nyx is a self-hosted Telegram bot powered by [OpenClaw](https://github.com/openclaw/openclaw), an open-source AI agent framework created by [Peter Steinberger](https://github.com/steipete).
 
-I started experimenting with Clawd over the weekend when the hype around it began — and it's an amazing project. This repository documents my deployment setup for running my own instance.
+I started experimenting with OpenClaw over the weekend when the hype around it began — and it's an amazing project. This repository documents my deployment setup for running my own instance.
 
 ### The Self-Migration Story
 
-One of the most mind-blowing stories from the Clawd community: while Peter was working from a hotel in Marrakech, Morocco, he jokingly told his bot that the door lock wasn't reliable and he hoped the laptop wouldn't get stolen. The bot replied "No problem—I'm your agent" and then autonomously migrated itself to Peter's London server via Tailscale. ([source](https://www.techflowpost.com/en-US/article/30106))
+One of the most mind-blowing stories from the OpenClaw community: while Peter was working from a hotel in Marrakech, Morocco, he jokingly told his bot that the door lock wasn't reliable and he hoped the laptop wouldn't get stolen. The bot replied "No problem—I'm your agent" and then autonomously migrated itself to Peter's London server via Tailscale. ([source](https://www.techflowpost.com/en-US/article/30106))
 
 I had a similar experience. I initially deployed Nyx on my dev VPS to experiment with it. When I decided to give it a dedicated home, I simply gave Nyx access to the Hetzner API and asked it to migrate itself. Ten minutes later — fully working on a brand new VPS, secrets configured, systemd service running. No manual intervention required.
 
-### What is Clawd?
+### What is OpenClaw?
 
-[Clawd](https://github.com/openclaw/openclaw) is an autonomous AI agent that can:
+[OpenClaw](https://github.com/openclaw/openclaw) is an autonomous AI agent that can:
 - Interact via Telegram (and other platforms)
 - Maintain persistent memory across conversations
 - Execute skills and tools autonomously
 - Generate images via DALL-E
 - Run scheduled tasks and briefings
 
-For more information, see the [Clawd GitHub repository](https://github.com/openclaw/openclaw).
+For more information, see the [OpenClaw GitHub repository](https://github.com/openclaw/openclaw).
 
 ## What Nyx Can Do
 
@@ -92,9 +92,10 @@ See [docs/nyx-server-setup.md](docs/nyx-server-setup.md) for full server specs.
 | Property | Value |
 |----------|-------|
 | Hostname | nyx |
-| Provider | Hetzner Cloud (CX22) |
+| Provider | Hetzner Cloud (CPX22) |
 | OS | Ubuntu 24.04.3 LTS |
 | Access | Via Tailscale |
+| Package Manager | Nix + Home Manager |
 
 ## Bot Access
 
@@ -104,8 +105,9 @@ Nyx is accessible via Telegram. The bot token is encrypted and decrypted at star
 
 ### Prerequisites
 
-- Node.js v22.22.0
-- npm 10.9.4
+- Nix package manager with Home Manager
+- Node.js v22.22.0 (via Nix)
+- npm 10.9.4 (via Nix)
 - SOPS with age encryption
 - Tailscale (for secure access)
 
@@ -248,7 +250,10 @@ Boot → systemd starts tmpfs mount → openclaw.service starts
                 ↓
     Secrets in RAM only (symlinked to original paths)
                 ↓
-    openclaw gateway start (as user fx)
+    openclaw gateway run (foreground mode, as user fx)
+
+Note: `gateway run` runs in foreground (required for systemd).
+      `gateway.auth.token` must be configured in openclaw.json.
 ```
 
 The service runs without D-Bus warnings thanks to:
@@ -414,13 +419,14 @@ sudo ./provision/nyx-import-secrets.sh --bundle /tmp/bundle.tar.gz.age
 
 | Phase | Description |
 |-------|-------------|
-| 1. Hetzner Setup | Create CX22 server (Ubuntu 24.04, nbg1) |
+| 1. Hetzner Setup | Create CPX22 server (Ubuntu 24.04, nbg1) |
 | 2. Base Config | Create fx user, SSH keys, hostname |
 | 3. Security | UFW, Fail2ban, SSH hardening, rkhunter |
 | 4. Secrets | Upload & import secrets bundle |
-| 5. Software | Node.js 22, openclaw, sops, age, gh, rclone |
-| 6. Service | Systemd service, tmpfs mount, decrypt scripts |
-| 7. Workspace | Restore ~/clawd/ from Dropbox |
+| 5. Software | Nix + Home Manager, node, openclaw, sops, age, gh, rclone |
+| 6. Service | Systemd service, tmpfs mount, gateway install + auth token |
+| 7. Workspace | Restore ~/clawd/ from Dropbox or NAS |
+| 7.5. Packages | Install tracked packages from INSTALLED.md |
 | 8. Tailscale | Install & connect |
 | 9. NAS Backup | Install backup script, configure cron |
 

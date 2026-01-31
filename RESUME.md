@@ -1,7 +1,7 @@
 # OpenClaw DR Migration - Resume Document
 
-**Date**: 2026-01-30
-**Status**: Paused - Resume tomorrow morning
+**Date**: 2026-01-31
+**Status**: E2E Test Complete - nyx-dr working
 
 ---
 
@@ -12,7 +12,7 @@
 | Server | IP (Tailscale) | SSH Key | Status | Config Path | Service Name |
 |--------|----------------|---------|--------|-------------|--------------|
 | **nyx** (prod) | 100.64.138.99 | `~/.ssh/id_nyx` | Running | `~/.clawdbot/` | `clawdbot-gateway` |
-| **nyx-dr** | 100.109.120.109 | `~/.ssh/id_nyx-dr` | Stopped | `~/.openclaw/` | `openclaw-gateway` |
+| **nyx-dr** | 100.112.184.36 | `~/.ssh/id_nyx-dr` | **Running** | `~/.openclaw/` | `openclaw` |
 
 ### What Works
 - Production nyx is running the Telegram bot (@NyxFXBot)
@@ -32,8 +32,8 @@
 | No SOPS/AGE on DR | DR didn't use proper secrets decryption flow | Needs reprovisioning |
 | Backup script bug | References `~/.openclaw/` but prod has `~/.clawdbot/` | Needs fix |
 
-### What Was Manually Copied to nyx-dr
-These items were copied manually during troubleshooting (not via provisioning):
+### What Was Restored via NAS (--restore-from-nas)
+All state now restored automatically via provisioning script:
 - `~/.openclaw/agents/main/agent/auth-profiles.json` - Anthropic OAuth tokens
 - `~/.openclaw/memory/main.sqlite` - 7.4MB conversation history
 - `~/.openclaw/cron/jobs.json` - 67 scheduled jobs (daily briefing, reminders)
@@ -74,31 +74,32 @@ install_tracked_packages() {
 
 ---
 
-### Phase 1: Test E2E Provisioning on nyx-dr
+### Phase 1: Test E2E Provisioning on nyx-dr - COMPLETED
 
 **Goal**: Validate the provisioning script works end-to-end
 
+**Command used**:
 ```bash
-# Option A: Wipe and reprovision existing server
 ./provision/nyx-provision.sh \
-  --existing-server nyx-dr \
-  --secrets-bundle ~/nyx-secrets-bundle.tar.gz.age \
-  --restore-from-nas
-
-# Option B: Delete from Hetzner and create fresh
-# (Delete nyx-dr in Hetzner console first)
-./provision/nyx-provision.sh \
+  --server-name nyx-dr \
   --secrets-bundle ~/nyx-secrets-bundle.tar.gz.age \
   --restore-from-nas
 ```
 
 **Verification checklist**:
-- [ ] SOPS/AGE decryption working (secrets in tmpfs)
-- [ ] Telegram bot responds to messages
-- [ ] Cron jobs loaded (should be 67 jobs)
-- [ ] Memory/conversation history intact
-- [ ] Backup scripts functional (`backup-to-nas.sh --test`)
-- [ ] Service auto-starts on reboot
+- [x] SOPS/AGE decryption working (secrets in tmpfs)
+- [x] Telegram bot responds to messages
+- [x] Cron jobs loaded (67 jobs)
+- [x] Memory/conversation history intact
+- [x] Backup scripts functional
+- [x] Service auto-starts on reboot
+
+**Fixes applied during E2E test**:
+1. `gateway run` instead of `gateway start` (foreground mode for systemd)
+2. `gateway.auth.token` configured in openclaw.json
+3. `OPENCLAW_GATEWAY_TOKEN` env var in start script
+4. Verification script fixed for remote execution (Tailscale hostname resolution)
+5. Verification script counter bug fixed (`|| true` for arithmetic)
 
 ### Phase 2: Recreate Production nyx
 
@@ -138,39 +139,43 @@ Both servers will have:
 ### Check Server Status
 ```bash
 # Production nyx
-ssh -i ~/.ssh/id_nyx fx@100.64.138.99 'systemctl --user status clawdbot-gateway --no-pager'
+ssh nyx 'systemctl --user status clawdbot-gateway --no-pager'
 
-# DR nyx-dr
-ssh -i ~/.ssh/id_nyx-dr fx@100.109.120.109 'systemctl --user status openclaw-gateway --no-pager'
+# DR nyx-dr (system service, not user service)
+ssh nyx-dr 'sudo systemctl status openclaw --no-pager'
 ```
 
 ### Failover: Production to DR
 ```bash
 # Stop production
-ssh -i ~/.ssh/id_nyx fx@100.64.138.99 'systemctl --user stop clawdbot-gateway'
+ssh nyx 'systemctl --user stop clawdbot-gateway'
 
 # Start DR
-ssh -i ~/.ssh/id_nyx-dr fx@100.109.120.109 'systemctl --user start openclaw-gateway'
+ssh nyx-dr 'sudo systemctl start openclaw'
 ```
 
 ### Failover: DR to Production
 ```bash
 # Stop DR
-ssh -i ~/.ssh/id_nyx-dr fx@100.109.120.109 'systemctl --user stop openclaw-gateway'
+ssh nyx-dr 'sudo systemctl stop openclaw'
 
 # Start production
-ssh -i ~/.ssh/id_nyx fx@100.64.138.99 'systemctl --user start clawdbot-gateway'
+ssh nyx 'systemctl --user start clawdbot-gateway'
 ```
 
 ### Check NAS Backup Contents
 ```bash
-ssh -i ~/.ssh/id_nyx-dr fx@100.109.120.109 \
-  'rsync --list-only --password-file=$HOME/.rsync-nas-password "rsync://rsync-user@100.98.9.111/Backup/nyx/"'
+ssh nyx-dr 'rsync --list-only --password-file=$HOME/.rsync-nas-password "rsync://rsync-user@100.98.9.111/Backup/nyx/"'
 ```
 
 ### Test NAS Connectivity
 ```bash
-ssh -i ~/.ssh/id_nyx-dr fx@100.109.120.109 '~/backup-to-nas.sh --test'
+ssh nyx-dr '~/backup-to-nas.sh --test'
+```
+
+### Run Verification Script
+```bash
+./provision/nyx-verify.sh --remote nyx-dr
 ```
 
 ---
@@ -213,7 +218,9 @@ rsync://100.98.9.111/Backup/nyx/
 ~/.openclaw/memory/main.sqlite        # Conversation history
 ~/.openclaw/cron/jobs.json            # Scheduled jobs
 ~/.openclaw/agents/main/agent/auth-profiles.json  # Anthropic auth
-~/.config/systemd/user/openclaw-gateway.service   # Systemd service
+/etc/systemd/system/openclaw.service  # Systemd service (system-level)
+/usr/local/bin/openclaw-start.sh      # Start script (decrypts + runs)
+~/.nix-profile/                       # Nix packages
 ```
 
 ---

@@ -5,11 +5,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Project Overview
 
 **openclaw-setup** is infrastructure-as-code for **Nyx**, a self-hosted Telegram bot powered by [OpenClaw](https://github.com/openclaw/openclaw). The project automates:
-- Complete server provisioning on Hetzner Cloud (CX22, Ubuntu 24.04)
+- Complete server provisioning on Hetzner Cloud (CPX22, Ubuntu 24.04)
 - Secret encryption/decryption using SOPS + AGE with tmpfs-based runtime storage
 - Security hardening (UFW, Fail2ban, SSH hardening, rkhunter)
 - Dual backup strategy (Dropbox + NAS via Tailscale)
 - Systemd service management with strict security policies
+- Declarative package management via Nix + Home Manager
 
 ## Architecture
 
