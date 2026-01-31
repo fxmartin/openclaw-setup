@@ -1,59 +1,35 @@
 #!/bin/bash
-# sync-packages.sh - Sync installed packages from Nyx to provisioning
+# sync-packages.sh - Package management utility for Nyx server
 #
-# Compares manually installed packages on Nyx with config/nyx-packages.txt
-# and shows differences. Use --update to overwrite the config file.
+# DEPRECATED: Package management has migrated from apt to Nix.
+# This script now serves as a reference and provides Nix guidance.
+#
+# The following packages are now managed by Nix (via Home Manager):
+#   curl, jq, git, gh, rsync, netcat, ffmpeg, pandoc, rclone, age, sops, nodejs_22
+#
+# Security packages remain on apt:
+#   fail2ban, ufw, rkhunter, unattended-upgrades
 #
 # Usage:
-#   ./sync-packages.sh              # Show diff
-#   ./sync-packages.sh --update     # Update provisioning config
-#
-# Run regularly to keep provisioning up-to-date with actual server state.
+#   ./sync-packages.sh              # Show Nix package management info
+#   ./sync-packages.sh --check-apt  # Compare apt security packages
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_DIR="$(dirname "$SCRIPT_DIR")"
-PACKAGES_FILE="$REPO_DIR/config/nyx-packages.txt"
-NYX_HOST="fx@100.64.138.99"
-SSH_KEY="$HOME/.ssh/id_nyx"
+NYX_HOST="nyx"
 
-# Packages to ignore (system/default packages that come with Ubuntu)
-IGNORE_PATTERNS="^lib|^python3-|linux-|ubuntu-|grub-|snap|^cloud-|^openssh|^ca-certificates"
+# Colors
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m'
 
-# ============================================
-# Helpers
-# ============================================
-
-log() {
-    echo "[$(date '+%H:%M:%S')] $1"
-}
-
-log_error() {
-    echo "[ERROR] $1" >&2
-}
-
-# Get manually installed packages from Nyx (excluding system/default packages)
-get_nyx_packages() {
-    local ssh_opts="-o StrictHostKeyChecking=accept-new -o BatchMode=yes"
-
-    if [[ -f "$SSH_KEY" ]]; then
-        ssh_opts+=" -i $SSH_KEY"
-    fi
-
-    # shellcheck disable=SC2086
-    ssh $ssh_opts "$NYX_HOST" \
-        "apt-mark showmanual | grep -vE '$IGNORE_PATTERNS' | sort" 2>/dev/null
-}
-
-# Get packages from provisioning config (ignoring comments and blank lines)
-get_provisioned_packages() {
-    if [[ -f "$PACKAGES_FILE" ]]; then
-        grep -vE '^\s*#|^\s*$' "$PACKAGES_FILE" | sort
-    else
-        echo ""
-    fi
-}
+log_info() { echo -e "${GREEN}[INFO]${NC} $*"; }
+log_warn() { echo -e "${YELLOW}[WARN]${NC} $*"; }
+log_step() { echo -e "${BLUE}[STEP]${NC} $*"; }
 
 # ============================================
 # Main
@@ -63,77 +39,114 @@ usage() {
     cat <<EOF
 Usage: $(basename "$0") [OPTIONS]
 
-Sync installed packages from Nyx server to provisioning config.
+Package management has migrated from apt to Nix with Home Manager.
 
 OPTIONS:
-    --update    Update config/nyx-packages.txt with packages from Nyx
-    -h, --help  Show this help
+    --check-apt     Check security packages still on apt
+    --status        Show Nix Home Manager status on Nyx
+    -h, --help      Show this help
 
-EXAMPLES:
-    $(basename "$0")           # Show differences
-    $(basename "$0") --update  # Overwrite config with Nyx packages
+NIX PACKAGE MANAGEMENT:
+    Most packages are now managed declaratively via Nix:
+
+    Update packages:
+      ssh $NYX_HOST '~/nix-update.sh'
+
+    Rollback to previous version:
+      ssh $NYX_HOST '~/nix-rollback.sh'
+
+    View generations:
+      ssh $NYX_HOST 'home-manager generations'
+
+SECURITY PACKAGES (still on apt):
+    fail2ban, ufw, rkhunter, unattended-upgrades
+
+    These packages have deep systemd/kernel integration and remain on apt.
+    They receive automatic security updates via unattended-upgrades.
+
+CONFIGURATION:
+    Nix config location: ~/nix-config/
+    - flake.nix:    Package definitions
+    - packages.nix: Home Manager configuration
+    - flake.lock:   Pinned versions (reproducibility)
+
 EOF
 }
 
-main() {
-    local update_mode=0
+check_apt_packages() {
+    log_step "Checking apt-managed security packages on Nyx..."
 
-    while [[ $# -gt 0 ]]; do
-        case "$1" in
-            --update)
-                update_mode=1
-                shift
-                ;;
-            -h|--help)
-                usage
-                exit 0
-                ;;
-            *)
-                log_error "Unknown option: $1"
-                usage
-                exit 1
-                ;;
-        esac
+    local security_packages=("fail2ban" "ufw" "rkhunter" "unattended-upgrades")
+
+    for pkg in "${security_packages[@]}"; do
+        if ssh "$NYX_HOST" "dpkg -l $pkg &>/dev/null" 2>/dev/null; then
+            local version
+            version=$(ssh "$NYX_HOST" "dpkg -l $pkg 2>/dev/null | tail -1 | awk '{print \$3}'" 2>/dev/null || echo "unknown")
+            echo -e "  ${GREEN}[OK]${NC} $pkg: $version"
+        else
+            echo -e "  ${RED}[MISSING]${NC} $pkg"
+        fi
     done
+}
 
-    log "Fetching packages from Nyx..."
+show_nix_status() {
+    log_step "Nix Home Manager status on Nyx..."
+    echo ""
 
-    # Get packages from both sources
-    local nyx_packages provisioned_packages
-    nyx_packages=$(get_nyx_packages)
-    provisioned_packages=$(get_provisioned_packages)
-
-    if [[ -z "$nyx_packages" ]]; then
-        log_error "Failed to get packages from Nyx. Is SSH configured?"
-        exit 1
-    fi
-
-    if [[ $update_mode -eq 1 ]]; then
-        log "Updating $PACKAGES_FILE..."
-
-        # Write header and packages
-        cat > "$PACKAGES_FILE" <<EOF
-# nyx-packages.txt - Packages to install on Nyx server
-# Auto-generated by sync-packages.sh on $(date '+%Y-%m-%d')
-# Manual edits will be preserved if you add comments
-
-EOF
-        echo "$nyx_packages" >> "$PACKAGES_FILE"
-
-        local count
-        count=$(echo "$nyx_packages" | wc -l | tr -d ' ')
-        log "Updated with $count packages"
-
+    # Check Nix installation
+    if ssh "$NYX_HOST" '. ~/.nix-profile/etc/profile.d/nix.sh 2>/dev/null && command -v nix &>/dev/null' 2>/dev/null; then
+        local nix_version
+        nix_version=$(ssh "$NYX_HOST" '. ~/.nix-profile/etc/profile.d/nix.sh && nix --version 2>/dev/null' 2>/dev/null || echo "unknown")
+        echo -e "  Nix: ${GREEN}installed${NC} ($nix_version)"
     else
-        echo ""
-        echo "=== Packages on Nyx but not in provisioning ==="
-        comm -23 <(echo "$nyx_packages") <(echo "$provisioned_packages") || echo "(none)"
-        echo ""
-        echo "=== Packages in provisioning but not on Nyx ==="
-        comm -13 <(echo "$nyx_packages") <(echo "$provisioned_packages") || echo "(none)"
-        echo ""
-        echo "Run with --update to sync from Nyx"
+        echo -e "  Nix: ${RED}not installed${NC}"
+        return 1
     fi
+
+    # Check Home Manager
+    if ssh "$NYX_HOST" '. ~/.nix-profile/etc/profile.d/nix.sh && command -v home-manager &>/dev/null' 2>/dev/null; then
+        local gen_count
+        gen_count=$(ssh "$NYX_HOST" '. ~/.nix-profile/etc/profile.d/nix.sh && home-manager generations 2>/dev/null | wc -l' 2>/dev/null || echo "0")
+        echo -e "  Home Manager: ${GREEN}available${NC} ($gen_count generations)"
+    else
+        echo -e "  Home Manager: ${YELLOW}not configured${NC}"
+    fi
+
+    # Show current generation
+    echo ""
+    log_step "Current Home Manager generation:"
+    ssh "$NYX_HOST" '. ~/.nix-profile/etc/profile.d/nix.sh 2>/dev/null && home-manager generations 2>/dev/null | head -3' 2>/dev/null || echo "  (unable to query)"
+
+    # Show Nix-managed packages
+    echo ""
+    log_step "Nix-managed packages:"
+    local packages=("age" "sops" "node" "rclone" "ffmpeg" "pandoc" "gh" "jq" "git" "curl" "rsync")
+    for pkg in "${packages[@]}"; do
+        if ssh "$NYX_HOST" ". ~/.nix-profile/etc/profile.d/nix.sh 2>/dev/null && command -v $pkg &>/dev/null" 2>/dev/null; then
+            echo -e "  ${GREEN}[OK]${NC} $pkg"
+        else
+            echo -e "  ${RED}[MISSING]${NC} $pkg"
+        fi
+    done
+}
+
+main() {
+    case "${1:-}" in
+        --check-apt)
+            check_apt_packages
+            ;;
+        --status)
+            show_nix_status
+            ;;
+        -h|--help|"")
+            usage
+            ;;
+        *)
+            echo -e "${RED}[ERROR]${NC} Unknown option: $1"
+            usage
+            exit 1
+            ;;
+    esac
 }
 
 main "$@"

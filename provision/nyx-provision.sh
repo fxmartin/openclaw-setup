@@ -125,6 +125,10 @@ parse_args() {
             -e|--existing-server)
                 EXISTING_SERVER="$2"
                 SKIP_HETZNER=1
+                # Also set SERVER_NAME if it looks like a hostname (not an IP)
+                if [[ ! "$2" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+                    SERVER_NAME="$2"
+                fi
                 shift 2
                 ;;
             --ssh-key)
@@ -337,26 +341,32 @@ create_hetzner_server() {
     SERVER_IP=$(hcloud server ip "$SERVER_NAME")
     log_success "Server created: $SERVER_NAME ($SERVER_IP)"
 
-    # Wait for SSH to be ready
+    # Wait for SSH to be ready (new servers can take 60-90 seconds to boot)
     log_substep "Waiting for SSH to be ready"
-    local max_attempts=30
+    local max_attempts=40
     local attempt=0
-    local ssh_opts="-o ConnectTimeout=5 -o StrictHostKeyChecking=no -o BatchMode=yes"
+    local ssh_opts="-o ConnectTimeout=5 -o StrictHostKeyChecking=no -o BatchMode=yes -o UserKnownHostsFile=/dev/null"
     [[ -n "$LOCAL_SSH_KEY" ]] && ssh_opts="$ssh_opts -i $LOCAL_SSH_KEY"
 
+    # Remove any stale known_hosts entry for this IP (server was recreated)
+    ssh-keygen -R "$SERVER_IP" &>/dev/null || true
+
+    # Show progress indicator
+    printf "  "
     while [[ $attempt -lt $max_attempts ]]; do
         # shellcheck disable=SC2086
-        if ssh $ssh_opts "root@${SERVER_IP}" "echo ready" &>/dev/null; then
-            log_success "SSH is ready"
-            break
+        if ssh $ssh_opts "root@${SERVER_IP}" "echo ready" 2>/dev/null; then
+            echo ""  # newline after dots
+            log_success "SSH is ready (took ~$((attempt * 5)) seconds)"
+            return 0
         fi
+        printf "."
         ((attempt++))
         sleep 5
     done
 
-    if [[ $attempt -ge $max_attempts ]]; then
-        log_fatal "Timeout waiting for SSH"
-    fi
+    echo ""  # newline after dots
+    log_fatal "Timeout waiting for SSH after $((max_attempts * 5)) seconds"
 }
 
 # ============================================
@@ -553,7 +563,7 @@ SCRIPT
 }
 
 # ============================================
-# Phase 5: Software Installation
+# Phase 5: Software Installation (Nix + apt)
 # ============================================
 
 install_software() {
@@ -565,82 +575,133 @@ install_software() {
     log_step "Installing software stack"
 
     if [[ $DRY_RUN -eq 1 ]]; then
-        log_info "[DRY-RUN] Would install packages from config/nyx-packages.txt"
-        log_info "[DRY-RUN] Would install: Node.js 22, sops, gh, rclone, openclaw"
+        log_info "[DRY-RUN] Would install Nix package manager (single-user)"
+        log_info "[DRY-RUN] Would apply Home Manager configuration with: curl, jq, git, gh, rsync, netcat, ffmpeg, pandoc, rclone, age, sops, nodejs_22"
+        log_info "[DRY-RUN] Would install security packages via apt: fail2ban, ufw, rkhunter, unattended-upgrades"
+        log_info "[DRY-RUN] Would install openclaw via npm"
         return 0
     fi
 
-    # Upload packages list
-    log_substep "Uploading package list"
-    remote_copy "${REPO_DIR}/config/nyx-packages.txt" "/tmp/nyx-setup/"
+    # 5a: Install Nix package manager
+    log_substep "Installing Nix package manager (single-user)"
+    remote_copy "${SCRIPT_DIR}/nyx-install-nix.sh" "/tmp/nyx-setup/"
+    remote_exec "chmod +x /tmp/nyx-setup/nyx-install-nix.sh && /tmp/nyx-setup/nyx-install-nix.sh $TARGET_USER"
 
+    # 5b: Copy and apply Nix configuration
+    log_substep "Applying Nix packages via Home Manager"
+    remote_exec "mkdir -p ${TARGET_HOME}/nix-config"
+    remote_copy "${REPO_DIR}/nix/flake.nix" "${TARGET_HOME}/nix-config/"
+    remote_copy "${REPO_DIR}/nix/flake.lock" "${TARGET_HOME}/nix-config/"
+    remote_copy "${REPO_DIR}/nix/packages.nix" "${TARGET_HOME}/nix-config/"
+    remote_exec "chown -R ${TARGET_USER}:${TARGET_USER} ${TARGET_HOME}/nix-config"
+
+    # Apply home-manager configuration
     remote_exec "bash -s" <<'SCRIPT'
 set -e
-
 TARGET_USER="fx"
 TARGET_HOME="/home/$TARGET_USER"
-PACKAGES_FILE="/tmp/nyx-setup/nyx-packages.txt"
+NIX_PROFILE="$TARGET_HOME/.nix-profile/etc/profile.d/nix.sh"
 
-echo "==> Installing apt packages from config..."
-if [[ -f "$PACKAGES_FILE" ]]; then
-    # Filter out comments and blank lines, install packages
-    grep -vE '^\s*#|^\s*$' "$PACKAGES_FILE" | xargs apt-get install -y -qq
-    echo "Installed packages from nyx-packages.txt"
-else
-    echo "WARN: Package list not found, installing defaults..."
-    apt-get install -y -qq curl jq git fail2ban ufw rkhunter ffmpeg pandoc rsync
-fi
+# Ensure required directories exist with correct ownership before Home Manager runs
+# Home Manager expects these directories to be writable by the user
+echo "==> Preparing user directories for Home Manager..."
+mkdir -p "$TARGET_HOME/.config/systemd/user"
+mkdir -p "$TARGET_HOME/.local/share"
+mkdir -p "$TARGET_HOME/.local/state"
+mkdir -p "$TARGET_HOME/.cache"
+chown -R "$TARGET_USER:$TARGET_USER" "$TARGET_HOME/.config"
+chown -R "$TARGET_USER:$TARGET_USER" "$TARGET_HOME/.local"
+chown -R "$TARGET_USER:$TARGET_USER" "$TARGET_HOME/.cache"
 
-echo "==> Installing Node.js 22..."
-if ! command -v node &>/dev/null; then
-    curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
-    apt-get install -y -qq nodejs
-fi
-node --version
-
-echo "==> Installing SOPS..."
-if ! command -v sops &>/dev/null; then
-    SOPS_VERSION="3.8.1"
-    curl -sLO "https://github.com/getsops/sops/releases/download/v${SOPS_VERSION}/sops-v${SOPS_VERSION}.linux.amd64"
-    mv "sops-v${SOPS_VERSION}.linux.amd64" /usr/local/bin/sops
-    chmod +x /usr/local/bin/sops
-fi
-sops --version
-
-echo "==> Installing GitHub CLI..."
-if ! command -v gh &>/dev/null; then
-    curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
-    chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg
-    echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | tee /etc/apt/sources.list.d/github-cli.list > /dev/null
-    apt-get update -qq
-    apt-get install -y -qq gh
-fi
-gh --version
-
-echo "==> Installing rclone..."
-if ! command -v rclone &>/dev/null; then
-    curl https://rclone.org/install.sh | bash
-fi
-rclone --version
-
-echo "==> Setting up npm global directory for user..."
+echo "==> Applying Home Manager configuration..."
 su - "$TARGET_USER" -c "
-    mkdir -p ~/.local/share/npm-global
-    npm config set prefix ~/.local/share/npm-global
-    echo 'export PATH=~/.local/share/npm-global/bin:\$PATH' >> ~/.bashrc
+    . '$NIX_PROFILE'
+    cd ~/nix-config
+    nix run home-manager/release-24.11 -- switch --flake .#fx
 "
+
+echo "==> Verifying Nix-managed packages..."
+su - "$TARGET_USER" -c "
+    . '$NIX_PROFILE'
+    echo 'age: '$(age --version)
+    echo 'sops: '$(sops --version | head -1)
+    echo 'node: '$(node --version)
+    echo 'rclone: '$(rclone --version | head -1)
+    echo 'gh: '$(gh --version | head -1)
+    echo 'jq: '$(jq --version)
+"
+SCRIPT
+
+    # 5c: Install security packages via apt (these need systemd/kernel integration)
+    log_substep "Installing security packages via apt"
+    remote_exec "apt-get install -y -qq fail2ban ufw rkhunter unattended-upgrades"
+
+    # 5d: Install openclaw via npm (using Nix-managed Node.js)
+    log_substep "Installing openclaw"
+    remote_exec "bash -s" <<'SCRIPT'
+set -e
+TARGET_USER="fx"
+TARGET_HOME="/home/$TARGET_USER"
+NIX_PROFILE="$TARGET_HOME/.nix-profile/etc/profile.d/nix.sh"
+
+# Fix ownership of npm cache directory (may have been created by root)
+echo "==> Fixing npm directory ownership..."
+if [[ -d "$TARGET_HOME/.npm" ]]; then
+    chown -R "$TARGET_USER:$TARGET_USER" "$TARGET_HOME/.npm"
+fi
+# Create npm global directory (Home Manager already configured .npmrc to use this path)
+mkdir -p "$TARGET_HOME/.local/share/npm-global/bin"
+chown -R "$TARGET_USER:$TARGET_USER" "$TARGET_HOME/.local/share/npm-global"
 
 echo "==> Installing openclaw globally..."
 su - "$TARGET_USER" -c "
+    . '$NIX_PROFILE'
     export PATH=~/.local/share/npm-global/bin:\$PATH
     npm install -g openclaw
     openclaw --version || echo 'openclaw installed'
 "
 
-echo "Software installation complete"
+echo "==> Installing openclaw gateway (enables 'gateway start' command)..."
+su - "$TARGET_USER" -c "
+    . '$NIX_PROFILE'
+    export PATH=~/.local/share/npm-global/bin:\$PATH
+    cd ~/clawd
+    openclaw gateway install || echo 'Gateway install completed'
+"
+
+echo "==> Setting gateway auth token in config..."
+su - "$TARGET_USER" -c "
+    . '$NIX_PROFILE'
+    export PATH=~/.local/share/npm-global/bin:\$PATH
+    openclaw config set gateway.auth.token local-gateway-token
+"
 SCRIPT
 
-    log_success "Software installed"
+    # 5e: Copy Nix helper scripts to server
+    log_substep "Installing Nix management scripts"
+    remote_copy "${REPO_DIR}/scripts/nix-update.sh" "${TARGET_HOME}/"
+    remote_copy "${REPO_DIR}/scripts/nix-rollback.sh" "${TARGET_HOME}/"
+    remote_exec "chmod +x ${TARGET_HOME}/nix-update.sh ${TARGET_HOME}/nix-rollback.sh && chown ${TARGET_USER}:${TARGET_USER} ${TARGET_HOME}/nix-update.sh ${TARGET_HOME}/nix-rollback.sh"
+
+    # 5f: Create symlinks for Nix tools that root needs (for systemd service startup)
+    log_substep "Creating system symlinks for Nix tools"
+    remote_exec "bash -s" <<'SCRIPT'
+TARGET_USER="fx"
+TARGET_HOME="/home/$TARGET_USER"
+NIX_BIN="$TARGET_HOME/.nix-profile/bin"
+
+# sops is needed by openclaw-start.sh to decrypt secrets (runs as root)
+if [[ -f "$NIX_BIN/sops" ]]; then
+    ln -sf "$NIX_BIN/sops" /usr/local/bin/sops
+    echo "Created symlink: /usr/local/bin/sops -> $NIX_BIN/sops"
+fi
+
+# Verify
+echo "System-accessible tools:"
+ls -la /usr/local/bin/{age,sops} 2>/dev/null || true
+SCRIPT
+
+    log_success "Software installed (Nix + apt)"
 }
 
 # ============================================
@@ -869,6 +930,102 @@ echo "Workspace restored from NAS"
 SCRIPT
 
     log_success "Workspace restore from NAS complete"
+}
+
+# ============================================
+# Phase 7.5: Install Tracked Packages
+# ============================================
+
+install_tracked_packages() {
+    log_step "Installing tracked packages from INSTALLED.md"
+
+    local installed_md="${TARGET_HOME}/clawd/INSTALLED.md"
+
+    # Check if INSTALLED.md exists
+    if ! remote_exec "test -f $installed_md"; then
+        log_info "No INSTALLED.md found (fresh install or no tracked packages)"
+        return 0
+    fi
+
+    if [[ $DRY_RUN -eq 1 ]]; then
+        log_info "[DRY-RUN] Would parse and install packages from $installed_md"
+        return 0
+    fi
+
+    # Copy parser script and execute
+    remote_exec "bash -s" <<'SCRIPT'
+set -e
+TARGET_USER="fx"
+TARGET_HOME="/home/$TARGET_USER"
+INSTALLED_MD="$TARGET_HOME/clawd/INSTALLED.md"
+NIX_PROFILE="$TARGET_HOME/.nix-profile/etc/profile.d/nix.sh"
+
+if [[ ! -f "$INSTALLED_MD" ]]; then
+    echo "INSTALLED.md not found, skipping"
+    exit 0
+fi
+
+# Ensure clawd venv exists for pip packages
+CLAWD_VENV="$TARGET_HOME/clawd/.venv"
+if [[ ! -d "$CLAWD_VENV" ]]; then
+    echo "==> Creating clawd Python venv..."
+    su - "$TARGET_USER" -c ". '$NIX_PROFILE' && cd ~/clawd && uv venv .venv"
+fi
+
+echo "==> Parsing $INSTALLED_MD..."
+
+# Parse markdown table, skip header rows
+while IFS='|' read -r _ date package method reason _; do
+    # Skip header separator rows
+    [[ "$date" =~ ^[[:space:]]*-+[[:space:]]*$ ]] && continue
+    # Skip header row
+    [[ "$package" =~ ^[[:space:]]*Package[[:space:]]*$ ]] && continue
+    # Skip empty lines
+    [[ -z "$package" ]] && continue
+
+    # Trim whitespace
+    package=$(echo "$package" | xargs)
+    method=$(echo "$method" | xargs)
+
+    # Skip if no package or baseline
+    [[ -z "$package" ]] && continue
+    [[ "$method" == "—" ]] && continue
+    [[ "$method" == "baseline" ]] && continue
+
+    echo "Installing: $package (method: $method)"
+
+    case "$method" in
+        "apt")
+            apt-get install -y -qq "$package" || echo "WARN: apt install failed for $package"
+            ;;
+        "pip (uv)"|"pip-uv"|"uv")
+            su - "$TARGET_USER" -c ". '$NIX_PROFILE' && cd ~/clawd && uv pip install '$package'" || echo "WARN: uv pip install failed for $package"
+            ;;
+        "pip")
+            su - "$TARGET_USER" -c ". '$NIX_PROFILE' && cd ~/clawd && source .venv/bin/activate && pip install '$package'" || echo "WARN: pip install failed for $package"
+            ;;
+        "pnpm")
+            su - "$TARGET_USER" -c ". '$NIX_PROFILE' && pnpm add -g '$package'" || echo "WARN: pnpm install failed for $package"
+            ;;
+        "npm")
+            su - "$TARGET_USER" -c ". '$NIX_PROFILE' && npm install -g '$package'" || echo "WARN: npm install failed for $package"
+            ;;
+        "cargo")
+            su - "$TARGET_USER" -c "cargo install '$package'" || echo "WARN: cargo install failed for $package"
+            ;;
+        "nix")
+            su - "$TARGET_USER" -c ". '$NIX_PROFILE' && nix-env -iA nixpkgs.$package" || echo "WARN: nix install failed for $package"
+            ;;
+        *)
+            echo "WARN: Unknown method '$method' for package '$package', skipping"
+            ;;
+    esac
+done < "$INSTALLED_MD"
+
+echo "Tracked package installation complete"
+SCRIPT
+
+    log_success "Tracked packages installed"
 }
 
 # ============================================
@@ -1169,7 +1326,12 @@ final_steps() {
     log_substep "Checking service status"
     remote_exec "systemctl status openclaw.service --no-pager || true"
 
+    # Cleanup BEFORE SSH hardening (root access will be disabled after hardening)
+    log_substep "Cleaning up temporary files"
+    remote_exec "rm -rf /tmp/nyx-setup/provision /tmp/nyx-setup/*.sh"
+
     # Apply SSH hardening (now that fx user is fully set up)
+    # This is the LAST remote command as root - after this, root SSH is disabled
     log_substep "Applying SSH hardening"
     remote_exec "bash -s" <<'SCRIPT'
 set -e
@@ -1183,8 +1345,12 @@ if [[ -f "$HARDENING_SRC" ]]; then
 
     if sshd -t; then
         echo "SSH configuration valid"
+        # Final cleanup before SSH restart (last chance as root)
+        rm -rf /tmp/nyx-setup
+        echo "Cleaned up /tmp/nyx-setup"
         systemctl restart ssh
         echo "SSH service restarted with hardening"
+        echo "NOTE: Root SSH access is now disabled. Use 'ssh fx@<server>' with sudo."
     else
         echo "ERROR: SSH configuration test failed!"
         rm -f "${SSH_CONFIG_DIR}/99-hardening.conf"
@@ -1192,12 +1358,9 @@ if [[ -f "$HARDENING_SRC" ]]; then
     fi
 else
     echo "WARN: SSH hardening config not found, skipping"
+    rm -rf /tmp/nyx-setup
 fi
 SCRIPT
-
-    # Cleanup
-    log_substep "Cleaning up"
-    remote_exec "rm -rf /tmp/nyx-setup"
 
     log_success "Provisioning complete"
 }
@@ -1268,6 +1431,21 @@ update_ssh_config_standalone() {
 main() {
     parse_args "$@"
 
+    # Resolve EXISTING_SERVER to IP if it's a Hetzner server name
+    if [[ -n "$EXISTING_SERVER" ]]; then
+        # If it doesn't contain @ and isn't an IP, look it up in Hetzner
+        if [[ ! "$EXISTING_SERVER" =~ @ ]] && [[ ! "$EXISTING_SERVER" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            local resolved_ip
+            if resolved_ip=$(hcloud server ip "$EXISTING_SERVER" 2>/dev/null); then
+                SERVER_IP="$resolved_ip"
+                EXISTING_SERVER="root@${resolved_ip}"
+            else
+                log_error "Could not resolve server '$EXISTING_SERVER' in Hetzner"
+                exit 1
+            fi
+        fi
+    fi
+
     # Handle standalone --update-ssh-config mode
     if [[ -n "$UPDATE_SSH_CONFIG_ONLY" ]]; then
         update_ssh_config_standalone "$UPDATE_SSH_CONFIG_ONLY"
@@ -1312,6 +1490,8 @@ main() {
         restore_workspace
         setup_tailscale
     fi
+
+    install_tracked_packages  # Phase 7.5: Install packages from INSTALLED.md
 
     setup_backups
     final_steps

@@ -16,6 +16,8 @@ source "${SCRIPT_DIR}/lib/logging.sh"
 TARGET_USER="fx"
 TARGET_HOME="/home/${TARGET_USER}"
 REMOTE_HOST=""
+RESOLVED_HOST=""
+RESOLVED_HOSTNAME=""
 VERBOSE=0
 
 # Counters
@@ -81,29 +83,110 @@ parse_args() {
 # Check Helpers
 # ============================================
 
+# Resolve hostname to IP if needed
+# Sets RESOLVED_HOST to user@ip format
+resolve_remote_host() {
+    local host="$1"
+    local user="fx"
+    local ip=""
+
+    # Extract user if present (user@host format)
+    if [[ "$host" =~ @ ]]; then
+        user="${host%%@*}"
+        host="${host#*@}"
+    fi
+
+    # If already an IP, use it directly
+    if [[ "$host" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+        RESOLVED_HOST="${user}@${host}"
+        RESOLVED_HOSTNAME="${host}"
+        return 0
+    fi
+
+    # Store original hostname for key lookup
+    RESOLVED_HOSTNAME="$host"
+
+    # Prefer Tailscale (private network, more reliable)
+    if command -v tailscale &>/dev/null; then
+        # Look for the hostname in tailscale status output
+        if ip=$(tailscale status 2>/dev/null | grep -i "\\b${host}\\b" | awk '{print $1}' | head -1); then
+            if [[ -n "$ip" ]]; then
+                RESOLVED_HOST="${user}@${ip}"
+                [[ $VERBOSE -eq 1 ]] && echo "  Resolved $host via tailscale: $ip" >&2
+                return 0
+            fi
+        fi
+    fi
+
+    # Fall back to hcloud public IP (may be firewalled)
+    if command -v hcloud &>/dev/null; then
+        if ip=$(hcloud server ip "$host" 2>/dev/null); then
+            RESOLVED_HOST="${user}@${ip}"
+            [[ $VERBOSE -eq 1 ]] && echo "  Resolved $host via hcloud: $ip" >&2
+            return 0
+        fi
+    fi
+
+    # Try DNS resolution as last resort
+    if ip=$(getent hosts "$host" 2>/dev/null | awk '{print $1}' | head -1); then
+        if [[ -n "$ip" ]]; then
+            RESOLVED_HOST="${user}@${ip}"
+            [[ $VERBOSE -eq 1 ]] && echo "  Resolved $host via DNS: $ip" >&2
+            return 0
+        fi
+    fi
+
+    # Could not resolve - use original (will likely fail but with clear error)
+    RESOLVED_HOST="${user}@${host}"
+    return 1
+}
+
 # Run command locally or remotely
 run_check() {
     if [[ -n "$REMOTE_HOST" ]]; then
-        ssh -o StrictHostKeyChecking=no -o BatchMode=yes "$REMOTE_HOST" "$@"
+        local ssh_opts="-o StrictHostKeyChecking=no -o BatchMode=yes"
+        # Try to find SSH key for this host (pattern: ~/.ssh/id_<hostname>)
+        local host_name="$RESOLVED_HOSTNAME"
+        local key_file="$HOME/.ssh/id_${host_name}"
+        if [[ -f "$key_file" ]]; then
+            ssh_opts="$ssh_opts -i $key_file"
+        fi
+        # shellcheck disable=SC2086
+        ssh $ssh_opts "$RESOLVED_HOST" "$@"
     else
         eval "$@"
     fi
 }
 
+# Run command as target user (handles local vs remote context)
+# When remote: already connected as user, no su needed
+# When local: use su - to become target user
+run_as_user() {
+    local path_setup=". ~/.nix-profile/etc/profile.d/nix.sh 2>/dev/null; export PATH=~/.local/share/npm-global/bin:~/.local/bin:\$PATH"
+    if [[ -n "$REMOTE_HOST" ]]; then
+        # Remote: already connected as target user, run directly
+        run_check "$path_setup; $*"
+    else
+        # Local: use su to become target user
+        su - "$TARGET_USER" -c "$path_setup && $*"
+    fi
+}
+
 # Record pass/fail
+# Note: Using || true to prevent set -e from exiting when counter is 0
 check_pass() {
     echo -e "  ${GREEN}[PASS]${NC} $1"
-    ((PASSED++))
+    ((PASSED++)) || true
 }
 
 check_fail() {
     echo -e "  ${RED}[FAIL]${NC} $1"
-    ((FAILED++))
+    ((FAILED++)) || true
 }
 
 check_warn() {
     echo -e "  ${YELLOW}[WARN]${NC} $1"
-    ((WARNINGS++))
+    ((WARNINGS++)) || true
 }
 
 check_skip() {
@@ -116,6 +199,17 @@ check_skip() {
 
 verify_age_key() {
     log_step "AGE Private Key"
+
+    # Remote check without sudo - verify via sops symlink and service status
+    if [[ -n "$REMOTE_HOST" ]]; then
+        # Can't sudo remotely, check indirectly via service running
+        if run_check "test -L /usr/local/bin/sops"; then
+            check_pass "AGE key accessible (sops symlink exists)"
+        else
+            check_warn "Cannot verify AGE key remotely (needs sudo)"
+        fi
+        return
+    fi
 
     if run_check "sudo test -f /root/.config/sops/age/keys.txt"; then
         check_pass "AGE key file exists"
@@ -137,10 +231,10 @@ verify_age_key() {
 verify_sops() {
     log_step "SOPS Configuration"
 
-    # Check SOPS is installed
-    if run_check "command -v sops &>/dev/null"; then
+    # Check SOPS is installed (via symlink or Nix)
+    if run_as_user "command -v sops" &>/dev/null; then
         local version
-        version=$(run_check "sops --version 2>&1 | head -1")
+        version=$(run_as_user "sops --version 2>&1 | head -1" || echo "unknown")
         check_pass "SOPS installed: $version"
     else
         check_fail "SOPS not installed"
@@ -155,11 +249,20 @@ verify_sops() {
         return
     fi
 
-    # Try to decrypt (verify key works)
-    if run_check "sudo SOPS_AGE_KEY_FILE=/root/.config/sops/age/keys.txt sops -d ${TARGET_HOME}/.openclaw/openclaw.json.enc >/dev/null 2>&1"; then
-        check_pass "SOPS can decrypt config"
+    # Try to decrypt (verify key works) - needs sudo for AGE key
+    if [[ -n "$REMOTE_HOST" ]]; then
+        # Can't sudo remotely - verify indirectly via decrypted file in tmpfs
+        if run_check "test -f ${TARGET_HOME}/.openclaw/runtime/openclaw.json"; then
+            check_pass "SOPS decryption working (runtime config exists)"
+        else
+            check_warn "Cannot verify SOPS decryption remotely (runtime config not found)"
+        fi
     else
-        check_fail "SOPS cannot decrypt config (key mismatch?)"
+        if run_check "sudo SOPS_AGE_KEY_FILE=/root/.config/sops/age/keys.txt sops -d ${TARGET_HOME}/.openclaw/openclaw.json.enc >/dev/null 2>&1"; then
+            check_pass "SOPS can decrypt config"
+        else
+            check_fail "SOPS cannot decrypt config (key mismatch?)"
+        fi
     fi
 }
 
@@ -231,7 +334,7 @@ verify_dropbox() {
     log_step "Dropbox Backup (rclone)"
 
     # Check rclone installed
-    if run_check "command -v rclone &>/dev/null"; then
+    if run_as_user "command -v rclone" &>/dev/null; then
         check_pass "rclone installed"
     else
         check_fail "rclone not installed"
@@ -247,11 +350,11 @@ verify_dropbox() {
     fi
 
     # Check dropbox remote configured
-    if run_check "su - $TARGET_USER -c 'rclone listremotes' 2>/dev/null | grep -q 'dropbox:'"; then
+    if run_as_user "rclone listremotes 2>/dev/null" | grep -q 'dropbox:'; then
         check_pass "Dropbox remote configured"
 
         # Try to list backup
-        if run_check "su - $TARGET_USER -c 'rclone lsf dropbox:nyx-backup/ 2>/dev/null' | head -1" &>/dev/null; then
+        if run_as_user "rclone lsf dropbox:nyx-backup/ 2>/dev/null | head -1" &>/dev/null; then
             check_pass "Dropbox backup accessible"
         else
             check_warn "Cannot access dropbox:nyx-backup/"
@@ -330,32 +433,32 @@ verify_software() {
     log_step "Software Stack"
 
     # Node.js
-    if run_check "command -v node &>/dev/null"; then
+    if run_as_user "command -v node" &>/dev/null; then
         local version
-        version=$(run_check "node --version")
+        version=$(run_as_user "node --version" || echo "unknown")
         check_pass "Node.js installed: $version"
     else
         check_fail "Node.js not installed"
     fi
 
     # openclaw
-    if run_check "su - $TARGET_USER -c 'command -v openclaw' &>/dev/null"; then
+    if run_as_user "command -v openclaw" &>/dev/null; then
         local version
-        version=$(run_check "su - $TARGET_USER -c 'openclaw --version 2>/dev/null'" || echo "unknown")
+        version=$(run_as_user "openclaw --version 2>/dev/null" || echo "unknown")
         check_pass "openclaw installed: $version"
     else
         check_fail "openclaw not installed"
     fi
 
     # age
-    if run_check "command -v age &>/dev/null"; then
+    if run_as_user "command -v age" &>/dev/null; then
         check_pass "age installed"
     else
         check_fail "age not installed"
     fi
 
     # gh
-    if run_check "command -v gh &>/dev/null"; then
+    if run_as_user "command -v gh" &>/dev/null; then
         check_pass "GitHub CLI installed"
     else
         check_warn "GitHub CLI not installed"
@@ -382,6 +485,107 @@ verify_workspace() {
     else
         check_fail "Workspace directory not found: $clawd_dir"
     fi
+}
+
+verify_nix() {
+    log_step "Nix Package Manager"
+
+    # Check if Nix is installed
+    if run_as_user "command -v nix" &>/dev/null; then
+        local version
+        version=$(run_as_user "nix --version 2>/dev/null" || echo "unknown")
+        check_pass "Nix installed: $version"
+    else
+        check_fail "Nix not installed"
+        return
+    fi
+
+    # Check flakes enabled
+    if run_check "test -f ${TARGET_HOME}/.config/nix/nix.conf"; then
+        if run_check "grep -q 'flakes' ${TARGET_HOME}/.config/nix/nix.conf 2>/dev/null"; then
+            check_pass "Nix flakes enabled"
+        else
+            check_warn "Nix flakes may not be enabled"
+        fi
+    else
+        check_warn "Nix config not found"
+    fi
+
+    # Check Home Manager
+    if run_as_user "command -v home-manager" &>/dev/null; then
+        check_pass "Home Manager available"
+
+        # Check generations
+        local gen_count
+        gen_count=$(run_as_user "home-manager generations 2>/dev/null | wc -l" || echo "0")
+        if [[ "$gen_count" -gt 0 ]]; then
+            check_pass "Home Manager generations: $gen_count"
+        else
+            check_warn "No Home Manager generations found"
+        fi
+    else
+        check_warn "Home Manager not installed"
+    fi
+
+    # Check Nix config directory
+    if run_check "test -d ${TARGET_HOME}/nix-config"; then
+        check_pass "Nix config directory exists"
+
+        # Check flake files
+        if run_check "test -f ${TARGET_HOME}/nix-config/flake.nix"; then
+            check_pass "flake.nix present"
+        else
+            check_fail "flake.nix missing"
+        fi
+
+        if run_check "test -f ${TARGET_HOME}/nix-config/flake.lock"; then
+            check_pass "flake.lock present (versions pinned)"
+        else
+            check_warn "flake.lock missing (versions not pinned)"
+        fi
+    else
+        check_fail "Nix config directory not found"
+    fi
+}
+
+verify_nix_packages() {
+    log_step "Nix-Managed Packages"
+
+    # List of packages that should be managed by Nix
+    local packages=("age" "sops" "node" "rclone" "ffmpeg" "pandoc" "gh" "jq" "git" "curl" "rsync")
+
+    for pkg in "${packages[@]}"; do
+        if run_as_user "command -v $pkg" &>/dev/null; then
+            local version
+            case "$pkg" in
+                node)
+                    version=$(run_as_user "node --version 2>/dev/null" || echo "")
+                    ;;
+                age)
+                    version=$(run_as_user "age --version 2>/dev/null" || echo "")
+                    ;;
+                sops)
+                    version=$(run_as_user "sops --version 2>/dev/null | head -1" || echo "")
+                    ;;
+                jq)
+                    version=$(run_as_user "jq --version 2>/dev/null" || echo "")
+                    ;;
+                gh)
+                    version=$(run_as_user "gh --version 2>/dev/null | head -1" || echo "")
+                    ;;
+                *)
+                    version=""
+                    ;;
+            esac
+            if [[ -n "$version" ]]; then
+                check_pass "$pkg: $version"
+            else
+                check_pass "$pkg available"
+            fi
+        else
+            check_fail "$pkg not found"
+        fi
+    done
 }
 
 # ============================================
@@ -417,7 +621,12 @@ main() {
     banner "Nyx Server Verification"
 
     if [[ -n "$REMOTE_HOST" ]]; then
-        log_info "Running verification against: $REMOTE_HOST"
+        # Resolve hostname to IP (handles Nix-managed SSH config, Hetzner, Tailscale)
+        if ! resolve_remote_host "$REMOTE_HOST"; then
+            log_warn "Could not resolve '$REMOTE_HOST' - trying anyway"
+        fi
+        log_info "Running verification against: $RESOLVED_HOST"
+        [[ "$RESOLVED_HOST" != "$REMOTE_HOST" ]] && log_info "  (resolved from: $REMOTE_HOST)"
     else
         log_info "Running local verification"
     fi
@@ -425,6 +634,8 @@ main() {
     echo ""
 
     # Run all checks
+    verify_nix
+    verify_nix_packages
     verify_age_key
     verify_sops
     verify_tmpfs

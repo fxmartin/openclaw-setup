@@ -74,10 +74,14 @@ fi
 log "Starting openclaw gateway as user $USER"
 
 # Run as user fx with proper environment
+# Include Nix profile bin for node and other Nix-managed tools
+# Use 'gateway run' (foreground) instead of 'gateway start' (systemd service trigger)
+# OPENCLAW_GATEWAY_TOKEN is required for gateway auth (value can be any string for local use)
 exec su - "$USER" -c "
-    export PATH=$USER_HOME/.local/share/npm-global/bin:$USER_HOME/.local/bin:/usr/local/bin:/usr/bin:/bin
+    export PATH=$USER_HOME/.nix-profile/bin:$USER_HOME/.local/share/npm-global/bin:$USER_HOME/.local/bin:/usr/local/bin:/usr/bin:/bin
     export XDG_RUNTIME_DIR=/run/user/1000
     export DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus
+    export OPENCLAW_GATEWAY_TOKEN=local-gateway-token
     cd $USER_HOME/clawd
-    $OPENCLAW_BIN gateway start
+    $OPENCLAW_BIN gateway run
 "
