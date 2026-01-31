@@ -96,9 +96,20 @@ resolve_remote_host() {
         host="${host#*@}"
     fi
 
-    # If already an IP, use it directly
+    # If already an IP, use it directly but try to find hostname for key lookup
     if [[ "$host" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
         RESOLVED_HOST="${user}@${host}"
+        # Try to reverse-lookup hostname from Tailscale for SSH key matching
+        if command -v tailscale &>/dev/null; then
+            local ts_hostname
+            ts_hostname=$(tailscale status 2>/dev/null | awk -v ip="$host" '$1 == ip {print $2; exit}')
+            if [[ -n "$ts_hostname" ]]; then
+                RESOLVED_HOSTNAME="$ts_hostname"
+                [[ $VERBOSE -eq 1 ]] && echo "  Reverse-resolved $host to $ts_hostname via tailscale" >&2
+                return 0
+            fi
+        fi
+        # Fallback: use IP as hostname (key lookup will fail gracefully)
         RESOLVED_HOSTNAME="${host}"
         return 0
     fi
@@ -108,8 +119,8 @@ resolve_remote_host() {
 
     # Prefer Tailscale (private network, more reliable)
     if command -v tailscale &>/dev/null; then
-        # Look for the hostname in tailscale status output
-        if ip=$(tailscale status 2>/dev/null | grep -i "\\b${host}\\b" | awk '{print $1}' | head -1); then
+        # Look for exact hostname match in tailscale status (column 2)
+        if ip=$(tailscale status 2>/dev/null | awk -v h="$host" '$2 == h {print $1; exit}'); then
             if [[ -n "$ip" ]]; then
                 RESOLVED_HOST="${user}@${ip}"
                 [[ $VERBOSE -eq 1 ]] && echo "  Resolved $host via tailscale: $ip" >&2
