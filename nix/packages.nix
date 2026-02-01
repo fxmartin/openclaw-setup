@@ -39,6 +39,11 @@
     # Media and document processing
     ffmpeg
     pandoc
+    yt-dlp
+
+    # Calendar and email
+    gcalcli
+    himalaya
 
     # Backup tools
     rclone
