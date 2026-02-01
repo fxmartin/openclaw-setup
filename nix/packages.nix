@@ -10,6 +10,37 @@
 #   Rollback: home-manager generations && home-manager switch --generation N
 
 { pkgs, ... }:
+let
+  # Himalaya 1.1.0 - pinned version (nixpkgs has outdated beta.4)
+  # Config format changed significantly between versions
+  himalaya-bin = pkgs.stdenv.mkDerivation rec {
+    pname = "himalaya";
+    version = "1.1.0";
+    
+    src = pkgs.fetchurl {
+      url = "https://github.com/pimalaya/himalaya/releases/download/v${version}/himalaya.x86_64-linux.tgz";
+      sha256 = "0qs0qncmx741w4c26kc13782sdb4lhz998dygs2027515mnpj64v";
+    };
+    
+    nativeBuildInputs = [ pkgs.autoPatchelfHook ];
+    buildInputs = [ pkgs.stdenv.cc.cc.lib ];
+    
+    sourceRoot = ".";
+    
+    installPhase = ''
+      mkdir -p $out/bin
+      cp himalaya $out/bin/
+      chmod +x $out/bin/himalaya
+    '';
+    
+    meta = with pkgs.lib; {
+      description = "CLI to manage emails";
+      homepage = "https://github.com/pimalaya/himalaya";
+      license = licenses.mit;
+      platforms = [ "x86_64-linux" ];
+    };
+  };
+in
 {
   home.username = "fx";
   home.homeDirectory = "/home/fx";
@@ -43,7 +74,7 @@
 
     # Calendar and email
     gcalcli
-    himalaya
+    himalaya-bin  # Pinned to 1.1.0 (see let block above)
 
     # Backup tools
     rclone
