@@ -103,14 +103,16 @@ sync_clawd() {
 
     log "Syncing clawd to Dropbox..."
 
-    local rclone_opts="-q"
+    local rclone_opts=""
+    if [[ $DRY_RUN -eq 1 ]]; then
+        rclone_opts="--dry-run -v"
+    else
+        rclone_opts="-q"
+    fi
+    
     for exclude in "${CLAWD_EXCLUDES[@]}"; do
         rclone_opts+=" --exclude=$exclude"
     done
-
-    if [[ $DRY_RUN -eq 1 ]]; then
-        rclone_opts+=" --dry-run -v"
-    fi
 
     # shellcheck disable=SC2086
     rclone sync "$src" "$dest" $rclone_opts 2>&1 | tee -a "$LOG_FILE"
@@ -129,14 +131,16 @@ sync_openclaw() {
 
     log "Syncing openclaw to Dropbox..."
 
-    local rclone_opts="-q"
+    local rclone_opts=""
+    if [[ $DRY_RUN -eq 1 ]]; then
+        rclone_opts="--dry-run -v"
+    else
+        rclone_opts="-q"
+    fi
+    
     for exclude in "${OPENCLAW_EXCLUDES[@]}"; do
         rclone_opts+=" --exclude=$exclude"
     done
-
-    if [[ $DRY_RUN -eq 1 ]]; then
-        rclone_opts+=" --dry-run -v"
-    fi
 
     # shellcheck disable=SC2086
     rclone sync "$src" "$dest" $rclone_opts 2>&1 | tee -a "$LOG_FILE"
