@@ -70,6 +70,7 @@ in
     # Media and document processing
     calibre  # ebook-convert, ebook-meta, ebook-polish for epub manipulation
     ffmpeg
+    ghostscript  # PDF manipulation, resizing for Remarkable
     pandoc
     poppler_utils  # pdftotext for Seneca letters extraction
     wkhtmltopdf-bin  # HTML/Markdown to PDF conversion
