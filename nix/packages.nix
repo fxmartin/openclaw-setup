@@ -70,6 +70,7 @@ in
     # Media and document processing
     ffmpeg
     pandoc
+    poppler_utils  # pdftotext for Seneca letters extraction
     yt-dlp
 
     # Calendar and email
