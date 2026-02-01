@@ -16,13 +16,8 @@ jobs:
     if: startsWith(github.head_ref, 'nyx/')
     
     steps:
-      - name: Auto-approve PR
-        uses: hmarr/auto-approve-action@v4
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          
-      - name: Enable auto-merge
-        run: gh pr merge --auto --squash "$PR_URL"
+      - name: Merge PR
+        run: gh pr merge --squash --delete-branch "$PR_URL"
         env:
           PR_URL: ${{ github.event.pull_request.html_url }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
