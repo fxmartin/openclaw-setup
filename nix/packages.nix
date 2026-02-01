@@ -97,5 +97,8 @@ in
   home.sessionVariables = {
     # Prevent npm from prompting for sudo
     NPM_CONFIG_PREFIX = "$HOME/.local/share/npm-global";
+    # Fix locale warnings in Nix-managed bash
+    LANG = "en_US.UTF-8";
+    LC_ALL = "en_US.UTF-8";
   };
 }
