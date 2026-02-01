@@ -71,6 +71,75 @@ if [[ -f "$SECRETS_DIR/telegram-bot-token.enc" ]]; then
     fi
 fi
 
+# Decrypt himalaya config if exists
+if [[ -f "$SECRETS_DIR/himalaya-config.toml.enc" ]]; then
+    log "Decrypting himalaya-config.toml.enc to tmpfs"
+    age -d -i "$AGE_KEY" "$SECRETS_DIR/himalaya-config.toml.enc" > "$RUNTIME_DIR/himalaya-config.toml"
+    chown "$USER:$USER" "$RUNTIME_DIR/himalaya-config.toml"
+    chmod 600 "$RUNTIME_DIR/himalaya-config.toml"
+
+    # Create symlink for himalaya to find the config
+    HIMALAYA_DIR="$USER_HOME/clawd/.himalaya"
+    mkdir -p "$HIMALAYA_DIR"
+    if [[ ! -L "$HIMALAYA_DIR/config.toml" ]]; then
+        rm -f "$HIMALAYA_DIR/config.toml"
+        ln -sf "$RUNTIME_DIR/himalaya-config.toml" "$HIMALAYA_DIR/config.toml"
+    fi
+    chown -R "$USER:$USER" "$HIMALAYA_DIR"
+fi
+
+# Decrypt market API keys if exists
+if [[ -f "$SECRETS_DIR/market-apis.json.enc" ]]; then
+    log "Decrypting market-apis.json.enc to tmpfs"
+    age -d -i "$AGE_KEY" "$SECRETS_DIR/market-apis.json.enc" > "$RUNTIME_DIR/market-apis.json"
+    chown "$USER:$USER" "$RUNTIME_DIR/market-apis.json"
+    chmod 600 "$RUNTIME_DIR/market-apis.json"
+
+    # Create symlink
+    if [[ ! -L "$SECRETS_DIR/market-apis.json" ]]; then
+        rm -f "$SECRETS_DIR/market-apis.json"
+        ln -sf "$RUNTIME_DIR/market-apis.json" "$SECRETS_DIR/market-apis.json"
+    fi
+fi
+
+# Decrypt Perplexity API key if exists
+if [[ -f "$SECRETS_DIR/perplexity.env.enc" ]]; then
+    log "Decrypting perplexity.env.enc to tmpfs"
+    age -d -i "$AGE_KEY" "$SECRETS_DIR/perplexity.env.enc" > "$RUNTIME_DIR/perplexity.env"
+    chown "$USER:$USER" "$RUNTIME_DIR/perplexity.env"
+    chmod 600 "$RUNTIME_DIR/perplexity.env"
+
+    # Create symlink
+    if [[ ! -L "$SECRETS_DIR/perplexity.env" ]]; then
+        rm -f "$SECRETS_DIR/perplexity.env"
+        ln -sf "$RUNTIME_DIR/perplexity.env" "$SECRETS_DIR/perplexity.env"
+    fi
+fi
+
+# Decrypt Readwise API token if exists
+if [[ -f "$SECRETS_DIR/readwise.json.enc" ]]; then
+    log "Decrypting readwise.json.enc to tmpfs"
+    age -d -i "$AGE_KEY" "$SECRETS_DIR/readwise.json.enc" > "$RUNTIME_DIR/readwise.json"
+    chown "$USER:$USER" "$RUNTIME_DIR/readwise.json"
+    chmod 600 "$RUNTIME_DIR/readwise.json"
+
+    # Create symlink
+    if [[ ! -L "$SECRETS_DIR/readwise.json" ]]; then
+        rm -f "$SECRETS_DIR/readwise.json"
+        ln -sf "$RUNTIME_DIR/readwise.json" "$SECRETS_DIR/readwise.json"
+    fi
+fi
+
+# Decrypt rclone config if exists (needed for Dropbox backups)
+if [[ -f "$SECRETS_DIR/rclone.conf.enc" ]]; then
+    log "Decrypting rclone.conf.enc"
+    RCLONE_DIR="$USER_HOME/.config/rclone"
+    mkdir -p "$RCLONE_DIR"
+    age -d -i "$AGE_KEY" "$SECRETS_DIR/rclone.conf.enc" > "$RCLONE_DIR/rclone.conf"
+    chown -R "$USER:$USER" "$RCLONE_DIR"
+    chmod 600 "$RCLONE_DIR/rclone.conf"
+fi
+
 log "Starting openclaw gateway as user $USER"
 
 # Run as user fx with proper environment
