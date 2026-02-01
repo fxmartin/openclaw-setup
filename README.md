@@ -574,3 +574,4 @@ cat ~/backup-nas.log
 ## License
 
 Private deployment documentation.
+# Test auto-merge Sun Feb  1 11:24:46 AM CET 2026
