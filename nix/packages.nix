@@ -68,6 +68,7 @@ in
     sops
 
     # Media and document processing
+    calibre  # ebook-convert, ebook-meta, ebook-polish for epub manipulation
     ffmpeg
     pandoc
     poppler_utils  # pdftotext for Seneca letters extraction
