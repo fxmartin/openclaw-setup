@@ -71,6 +71,7 @@ in
     ffmpeg
     pandoc
     poppler_utils  # pdftotext for Seneca letters extraction
+    wkhtmltopdf-bin  # HTML/Markdown to PDF conversion
     yt-dlp
 
     # Calendar and email
