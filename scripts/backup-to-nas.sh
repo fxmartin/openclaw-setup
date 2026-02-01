@@ -16,6 +16,17 @@
 set -euo pipefail
 
 # ============================================
+# Environment Setup (for cron)
+# ============================================
+
+# Source nix profile for nix-managed tools
+if [[ -f "$HOME/.nix-profile/etc/profile.d/nix.sh" ]]; then
+    # shellcheck source=/dev/null
+    . "$HOME/.nix-profile/etc/profile.d/nix.sh"
+fi
+export PATH="$HOME/.nix-profile/bin:$HOME/.local/bin:$PATH"
+
+# ============================================
 # Configuration
 # ============================================
 
