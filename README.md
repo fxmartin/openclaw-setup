@@ -575,7 +575,58 @@ cat ~/backup-nas.log
 0 4 * * 0 /home/fx/security-scan.sh
 ```
 
+## Nix Package Management
+
+Nyx uses **Nix + Home Manager** for declarative package management with rollback capability.
+
+### Nix-Managed Packages
+
+| Category | Packages |
+|----------|----------|
+| System utilities | curl, jq, netcat, rsync |
+| Development | git, gh, uv |
+| Encryption | age, sops |
+| Media/Docs | ffmpeg, pandoc, yt-dlp |
+| Calendar/Email | gcalcli, himalaya (v1.1.0 pinned) |
+| Backup | rclone |
+| Runtime | nodejs_22 |
+
+### Package Management Commands
+
+```bash
+# SSH to Nyx
+ssh nyx
+
+# Rebuild (apply current config)
+home-manager switch --flake ~/nix-config#fx
+
+# Update packages (pull latest nixpkgs + rebuild)
+~/nix-update.sh
+
+# Dry-run update
+~/nix-update.sh --dry-run
+
+# Rollback to previous generation
+home-manager generations              # list generations
+home-manager switch --generation N    # rollback to N
+# Or use: ~/nix-rollback.sh
+```
+
+### Adding New Packages
+
+1. Edit `nix/packages.nix` locally
+2. Copy to Nyx: `scp nix/packages.nix nyx:~/nix-config/`
+3. Rebuild: `home-manager switch --flake ~/nix-config#fx`
+
+### Configuration Location
+
+| File | Purpose |
+|------|---------|
+| `nix/flake.nix` | Flake definition (nixpkgs 24.11) |
+| `nix/flake.lock` | Pinned versions |
+| `nix/packages.nix` | Package list + Home Manager config |
+| `~/nix-config/` (on Nyx) | Active configuration |
+
 ## License
 
 Private deployment documentation.
-# Test Sun Feb  1 11:26:16 AM CET 2026
