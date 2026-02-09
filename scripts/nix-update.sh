@@ -4,6 +4,19 @@
 #
 # Usage: nix-update.sh [--dry-run]
 
+# === ENVIRONMENT BOOTSTRAP (before strict mode) ===
+# Ensure critical vars exist for cron environments
+export HOME="${HOME:-/home/fx}"
+export USER="${USER:-fx}"
+export PATH="$HOME/.nix-profile/bin:$HOME/.local/bin:/usr/local/bin:/usr/bin:/bin:$PATH"
+
+# Source Nix profile if it exists
+if [[ -f "$HOME/.nix-profile/etc/profile.d/nix.sh" ]]; then
+    # shellcheck source=/dev/null
+    . "$HOME/.nix-profile/etc/profile.d/nix.sh" 2>/dev/null || true
+fi
+
+# === NOW enable strict mode ===
 set -euo pipefail
 
 # Colors for output
@@ -23,14 +36,11 @@ if [[ "${1:-}" == "--dry-run" ]]; then
     log_warn "Dry run mode - no changes will be applied"
 fi
 
-# Ensure Nix is available
-if [[ -f "$HOME/.nix-profile/etc/profile.d/nix.sh" ]]; then
-    # shellcheck source=/dev/null
-    . "$HOME/.nix-profile/etc/profile.d/nix.sh"
-fi
-
+# Verify Nix is available
 if ! command -v nix &>/dev/null; then
     echo -e "${RED}[ERROR]${NC} Nix not found. Is it installed?"
+    echo -e "${RED}[DEBUG]${NC} PATH=$PATH"
+    echo -e "${RED}[DEBUG]${NC} HOME=$HOME"
     exit 1
 fi
 
@@ -51,7 +61,7 @@ echo ""
 # Update flake.lock
 log_step "Updating flake inputs (nixpkgs, home-manager)..."
 if [[ "${DRY_RUN}" == true ]]; then
-    nix flake update --dry-run
+    log_info "Would run: nix flake update"
 else
     nix flake update
 fi
