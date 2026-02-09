@@ -94,6 +94,9 @@ ls -la ~/.openclaw/runtime/       # verify secrets decrypted
 ## Directory Structure
 
 ```
+.githooks/          # Version-controlled git hooks
+  pre-commit           # Gitleaks secret scanning
+
 provision/          # Server provisioning automation
   nyx-provision.sh     # Main orchestrator (9 phases)
   nyx-export-bundle.sh # Export secrets locally
@@ -104,17 +107,31 @@ config/             # Systemd & decryption configuration
   openclaw.service     # Main service unit
   openclaw-runtime.mount # tmpfs mount unit
   openclaw-start.sh    # Startup: decrypt + symlink + start
-  nyx-packages.txt     # Package manifest (34 packages)
+  openclaw-decrypt.sh  # Decrypt wrapper (calls sudo)
+  sops-decrypt-config  # SOPS decrypt helper
+  nyx-packages.txt     # Package manifest
 
 scripts/            # Operational scripts
   backup-to-dropbox.sh # Daily Dropbox sync (3:00 AM)
   backup-to-nas.sh     # Daily NAS rsync (3:30 AM, Tailscale)
   restore-from-nas.sh  # Disaster recovery from NAS
   security-scan.sh     # Weekly rkhunter scan (Sunday 4:00 AM)
+  nix-update.sh        # Update Nix flake + rebuild
+  nix-rollback.sh      # Rollback Nix generation
+  sync-packages.sh     # Sync package manifest to server
+  setup-nas-backup.sh  # NAS backup setup helper
+  install-git-hooks.sh # One-time hook setup
 
 security/           # Security hardening scripts
   setup-security.sh    # Master security installer
   ufw-setup.sh         # Firewall rules
+  fail2ban-jail.local  # Fail2ban rules
+  sshd-hardening.conf  # SSH config
+
+nix/                # Nix + Home Manager configuration
+  flake.nix            # Flake definition
+  flake.lock           # Pinned versions
+  packages.nix         # Package list
 
 docs/               # Documentation
 tests/              # Integration tests

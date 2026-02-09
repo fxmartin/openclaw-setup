@@ -466,26 +466,44 @@ sudo ./provision/nyx-import-secrets.sh --bundle /tmp/bundle.tar.gz.age
 
 ```
 openclaw-setup/
+├── .githooks/
+│   └── pre-commit                 # Gitleaks pre-commit secret scanning
+├── .gitleaks.toml                 # Gitleaks config + allowlist
+├── .github/workflows/
+│   ├── auto-merge.yml             # Auto-merge Nyx PRs (nyx/* branches)
+│   └── security-scan.yml          # Gitleaks secret detection (CI)
 ├── provision/
 │   ├── nyx-export-bundle.sh       # Export from local (recommended)
 │   ├── nyx-provision.sh           # Main entry point
 │   ├── nyx-export-secrets.sh      # Export (run on Nyx)
 │   ├── nyx-import-secrets.sh      # Import bundle
+│   ├── nyx-install-nix.sh         # Nix + Home Manager installer
 │   ├── nyx-verify.sh              # Verification
 │   └── lib/
 │       └── logging.sh             # Logging utilities
 ├── config/
 │   ├── openclaw.service           # Systemd service
 │   ├── openclaw-runtime.mount     # tmpfs mount unit
-│   ├── openclaw-start.sh          # Start script
-│   ├── openclaw-decrypt.sh        # Decrypt wrapper
-│   ├── sops-decrypt-config        # SOPS helper
-│   ├── age-decrypt-token          # AGE helper
+│   ├── openclaw-start.sh          # Start script (decrypt + symlink + start)
+│   ├── openclaw-decrypt.sh        # Decrypt wrapper (calls sudo)
+│   ├── sops-decrypt-config        # SOPS decrypt helper
+│   ├── nyx-packages.txt           # Package manifest
 │   └── sudoers.d/
 │       └── openclaw-decrypt       # NOPASSWD rules
 ├── scripts/
-│   ├── backup-to-nas.sh           # NAS backup via rsync
-│   └── setup-nas-backup.sh        # NAS backup setup helper
+│   ├── backup-to-dropbox.sh       # Daily Dropbox sync (3:00 AM)
+│   ├── backup-to-nas.sh           # Daily NAS rsync (3:30 AM, Tailscale)
+│   ├── restore-from-nas.sh        # Disaster recovery from NAS
+│   ├── security-scan.sh           # Weekly rkhunter scan (Sunday 4:00 AM)
+│   ├── nix-update.sh              # Update Nix flake + rebuild
+│   ├── nix-rollback.sh            # Rollback Nix generation
+│   ├── sync-packages.sh           # Sync package manifest to server
+│   ├── setup-nas-backup.sh        # NAS backup setup helper
+│   └── install-git-hooks.sh       # One-time hook setup
+├── nix/
+│   ├── flake.nix                  # Flake definition (nixpkgs 24.11)
+│   ├── flake.lock                 # Pinned versions
+│   └── packages.nix               # Package list + Home Manager config
 ├── security/
 │   ├── setup-security.sh          # Security installer
 │   ├── ufw-setup.sh               # Firewall setup
@@ -495,6 +513,7 @@ openclaw-setup/
 │   └── test-bundle-roundtrip.sh   # Bundle test
 ├── docs/
 │   ├── nyx-server-setup.md        # Server specs
+│   ├── DR-SETUP.md                # Disaster recovery reference
 │   ├── sops-age-setup.md          # Secrets management
 │   └── services-inventory.md      # Skills inventory
 └── assets/
@@ -520,7 +539,7 @@ Daily at 3:30am via rsync daemon over Tailscale:
 
 | Setting | Value |
 |---------|-------|
-| NAS IP | 100.98.9.111 (Tailscale) |
+| NAS IP | (Tailscale private IP) |
 | Rsync Port | 873 |
 | Rsync User | rsync-user |
 | Rsync Module | Backup |
@@ -627,6 +646,31 @@ home-manager switch --generation N    # rollback to N
 | `nix/packages.nix` | Package list + Home Manager config |
 | `~/nix-config/` (on Nyx) | Active configuration |
 
+## Development
+
+### Pre-Commit Secret Scanning
+
+This repository uses [gitleaks](https://github.com/gitleaks/gitleaks) to prevent secrets from entering git history. A GitHub Actions workflow scans on push/PR, and a local pre-commit hook catches secrets before they're committed.
+
+**One-time setup:**
+
+```bash
+# Install gitleaks
+brew install gitleaks
+
+# Activate the pre-commit hook
+./scripts/install-git-hooks.sh
+```
+
+The hook runs `gitleaks protect --staged` on every commit. If a secret is detected, the commit is blocked.
+
+**Updating the allowlist:**
+
+Known non-secrets (AGE public keys, placeholder tokens, etc.) are allowlisted in `.gitleaks.toml`. To add a new entry:
+
+1. Add a regex to the `regexes` array, or a path pattern to the `paths` array
+2. Test with: `gitleaks protect --staged --config=.gitleaks.toml --verbose`
+
 ## License
 
-Private deployment documentation.
+MIT License. See [LICENSE](LICENSE) for details.

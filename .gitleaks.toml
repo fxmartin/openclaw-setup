@@ -1,0 +1,27 @@
+# .gitleaks.toml - Gitleaks configuration for openclaw-setup
+# Keep all ~150 default rules active, add allowlist for known non-secrets.
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Known non-secrets and encrypted files"
+
+# AGE public key (safe by design - only private keys are secrets)
+# Telegram chat ID (useless without bot token)
+# Placeholder gateway token (not a real credential)
+regexes = [
+  '''age10jj52pql3htczwt6c39v598vwjgxayaemweq2c7t5p4gp996549sq9p9c5''',
+  '''TELEGRAM_CHAT_ID="8332440542"''',
+  '''TELEGRAM_CHAT_ID:-8332440542''',
+  '''OPENCLAW_GATEWAY_TOKEN=local-gateway-token''',
+  '''gateway\.auth\.token local-gateway-token''',
+  '''sk-test-key-1234567890''',
+]
+
+# Encrypted files are not secrets themselves
+paths = [
+  '''.*\.enc$''',
+  '''.*\.age$''',
+  '''.*\.enc\..*$''',
+]

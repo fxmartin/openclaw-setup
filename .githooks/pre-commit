@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+# pre-commit hook - Scan staged changes for secrets using gitleaks
+# Install: ./scripts/install-git-hooks.sh
+
+set -euo pipefail
+
+# Colors
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[0;33m'
+BLUE='\033[0;34m'
+BOLD='\033[1m'
+NC='\033[0m'
+
+# Check gitleaks is installed
+if ! command -v gitleaks &> /dev/null; then
+    echo -e "${RED}${BOLD}[ERROR]${NC} gitleaks is not installed"
+    echo -e "${YELLOW}[WARN]${NC}  Install it to enable secret detection:"
+    echo -e "         ${BLUE}brew install gitleaks${NC}  (macOS)"
+    echo -e "         ${BLUE}nix-env -iA nixpkgs.gitleaks${NC}  (Nix)"
+    echo -e "         See: https://github.com/gitleaks/gitleaks#installing"
+    exit 1
+fi
+
+echo -e "${BLUE}[INFO]${NC} Scanning staged changes for secrets..."
+
+# Run gitleaks on staged changes
+if gitleaks protect --staged --config=.gitleaks.toml --verbose --redact; then
+    echo -e "${GREEN}[OK]${NC} No secrets detected"
+    exit 0
+else
+    echo -e ""
+    echo -e "${RED}${BOLD}[BLOCKED]${NC} Secrets detected in staged changes!"
+    echo -e "${YELLOW}[WARN]${NC}  If this is a false positive, add an allowlist entry to ${BOLD}.gitleaks.toml${NC}"
+    echo -e "${YELLOW}[WARN]${NC}  Never use --no-verify to bypass this check"
+    exit 1
+fi
