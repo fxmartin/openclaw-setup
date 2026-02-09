@@ -34,6 +34,9 @@ USER.md
 *.db
 *.sqlite
 
+# Local-only docs (operational runbooks)
+*.local
+
 # OS files
 .DS_Store
 Thumbs.db
