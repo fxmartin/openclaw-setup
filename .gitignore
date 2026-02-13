@@ -37,6 +37,13 @@ USER.md
 # Local-only docs (operational runbooks)
 *.local
 
+# Mission Control build artifacts and runtime data
+mission-control/node_modules/
+mission-control/.next/
+mission-control/data/*.db
+mission-control/data/*.db-shm
+mission-control/data/*.db-wal
+
 # OS files
 .DS_Store
 Thumbs.db

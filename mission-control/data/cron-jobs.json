@@ -1,0 +1,2361 @@
+{
+  "jobs": [
+    {
+      "id": "5d503078-c51b-43e8-beda-134d8664228d",
+      "agentId": "main",
+      "name": "Anthropic Status Check",
+      "enabled": true,
+      "createdAtMs": 1769529060626,
+      "updatedAtMs": 1770969610398,
+      "schedule": {
+        "kind": "cron",
+        "expr": "0 * * * *",
+        "tz": "Europe/Luxembourg"
+      },
+      "sessionTarget": "isolated",
+      "wakeMode": "next-heartbeat",
+      "payload": {
+        "kind": "agentTurn",
+        "message": "Check news-intake@fxmartin.me for Anthropic Status emails from the last hour.\n\nRun: himalaya -c ~/clawd/.himalaya/config.toml envelope list -a news-intake -s 30 2>/dev/null\n\nLook for emails from 'statuspage.io' or with 'Anthropic' in subject. If there are new incidents (created/updated/resolved), send FX a brief Telegram alert. If no statuspage.io emails found, that's good news — reply with a simple 'All clear. 🌙' but do NOT send anything to Telegram."
+      },
+      "state": {
+        "nextRunAtMs": 1770973200000,
+        "lastRunAtMs": 1770969600044,
+        "lastStatus": "ok",
+        "lastDurationMs": 10354,
+        "consecutiveErrors": 0
+      },
+      "delivery": {
+        "mode": "none",
+        "channel": "telegram",
+        "to": "8332440542"
+      }
+    },
+    {
+      "id": "42754e3b-4110-4951-ba1d-d264883f8f04",
+      "agentId": "main",
+      "name": "apple-fold-monitor",
+      "description": "Weekly Apple foldable iPhone rumors tracker",
+      "createdAtMs": 1770022220885,
+      "updatedAtMs": 1770022220885,
+      "schedule": {
+        "kind": "cron",
+        "expr": "0 11 * * 5",
+        "tz": "Europe/Luxembourg"
+      },
+      "sessionTarget": "isolated",
+      "wakeMode": "next-heartbeat",
+      "payload": {
+        "kind": "agentTurn",
+        "message": "Check for Apple foldable iPhone news and rumors.\n\n1. Run Perplexity search:\n   ```\n   export $(cat ~/.secrets/perplexity.env) && node ~/clawd/skills/perplexity/scripts/search.mjs \"Apple foldable iPhone latest news rumors release date 2026\"\n   ```\n\n2. Read current status from ~/clawd/memory/monitors/apple-fold-status.md\n\n3. Compare new info with stored status. Look for:\n   - New release date estimates\n   - Official Apple announcements\n   - Credible leaks (supply chain, analysts like Ming-Chi Kuo, Mark Gurman)\n   - New feature rumors\n   - Production/manufacturing news\n\n4. If there's SIGNIFICANT new information:\n   - Send Telegram update to FX with summary of what's new\n   - Update the status file with new info and timestamp\n\n5. If the phone is OFFICIALLY ANNOUNCED:\n   - Send immediate notification\n   - Update status to 'Official'\n   - Note: This job can be disabled after official release\n\n6. If no significant new info: Just update 'Last checked' date silently, do NOT notify\n\nBe selective - only notify on meaningful developments, not recycled rumors."
+      },
+      "state": {
+        "nextRunAtMs": 1770976800000
+      },
+      "enabled": true,
+      "delivery": {
+        "mode": "announce",
+        "channel": "telegram",
+        "to": "8332440542"
+      }
+    },
+    {
+      "id": "3f4b9f1a-9fdf-4b3e-83de-fbf8d8895d31",
+      "agentId": "main",
+      "name": "youtube-indydevdan-check",
+      "description": "Check IndyDevDan YouTube for new videos",
+      "enabled": true,
+      "createdAtMs": 1769426141350,
+      "updatedAtMs": 1770962418507,
+      "schedule": {
+        "kind": "cron",
+        "expr": "0 */6 * * *",
+        "tz": "UTC"
+      },
+      "sessionTarget": "isolated",
+      "wakeMode": "next-heartbeat",
+      "payload": {
+        "kind": "agentTurn",
+        "message": "Check IndyDevDan YouTube channel for new videos.\n\n1. Fetch RSS: https://www.youtube.com/feeds/videos.xml?channel_id=UC_x36zCEGilGpB1m-V4gmjg\n2. Get latest video ID from RSS\n3. Compare with stored ID in ~/clawd/memory/youtube/indydevdan-last.txt\n4. If different (new video):\n   - Extract title, description, and link from RSS\n   - Write a 2-3 sentence summary of what the video is about based on the description\n   - Send notification to Telegram:\n     \"🎬 **New IndyDevDan Video**\\n\\n**[title]**\\n[link]\\n\\n[your 2-3 sentence summary of what the video covers and why it might be interesting]\"\n   - Update the stored ID file\n5. If same, do nothing (no notification needed)\n\nOnly notify if there's actually a NEW video."
+      },
+      "state": {
+        "nextRunAtMs": 1770984000000,
+        "lastRunAtMs": 1770962400044,
+        "lastStatus": "ok",
+        "lastDurationMs": 18463,
+        "consecutiveErrors": 0
+      },
+      "delivery": {
+        "mode": "announce",
+        "channel": "telegram",
+        "to": "8332440542"
+      }
+    },
+    {
+      "id": "f00e97d0-5cce-42f6-abb1-f61b7dd57121",
+      "agentId": "main",
+      "name": "youtube-azisk-check",
+      "description": "Check Alex Ziskind YouTube for new videos",
+      "enabled": true,
+      "createdAtMs": 1769426268343,
+      "updatedAtMs": 1770962439794,
+      "schedule": {
+        "kind": "cron",
+        "expr": "0 */6 * * *",
+        "tz": "UTC"
+      },
+      "sessionTarget": "isolated",
+      "wakeMode": "next-heartbeat",
+      "payload": {
+        "kind": "agentTurn",
+        "message": "Check Alex Ziskind YouTube channel for new videos.\n\n1. Fetch RSS: https://www.youtube.com/feeds/videos.xml?channel_id=UCajiMK_CY9icRhLepS8_3ug\n2. Get latest video ID from RSS\n3. Compare with stored ID in ~/clawd/memory/youtube/azisk-last.txt\n4. If different (new video):\n   - Extract title, description, and link from RSS\n   - Write a 2-3 sentence summary of what the video is about based on the description\n   - Send notification to Telegram:\n     \"🎬 **New Alex Ziskind Video**\\n\\n**[title]**\\n[link]\\n\\n[your 2-3 sentence summary of what the video covers and why it might be interesting]\"\n   - Update the stored ID file\n5. If same, do nothing (no notification needed)\n\nOnly notify if there's actually a NEW video."
+      },
+      "state": {
+        "nextRunAtMs": 1770984000000,
+        "lastRunAtMs": 1770962418507,
+        "lastStatus": "ok",
+        "lastDurationMs": 21287,
+        "consecutiveErrors": 0
+      },
+      "delivery": {
+        "mode": "announce",
+        "channel": "telegram",
+        "to": "8332440542"
+      }
+    },
+    {
+      "id": "4ca92abd-3fba-43e6-a48f-e9ca99a070c6",
+      "agentId": "main",
+      "name": "daily-token-report",
+      "description": "Daily token usage report email at 7pm CET",
+      "enabled": true,
+      "createdAtMs": 1769434463389,
+      "updatedAtMs": 1770919278595,
+      "schedule": {
+        "kind": "cron",
+        "expr": "0 19 * * *",
+        "tz": "Europe/Luxembourg"
+      },
+      "sessionTarget": "isolated",
+      "wakeMode": "next-heartbeat",
+      "payload": {
+        "kind": "agentTurn",
+        "message": "Generate daily token usage report and send via email.\n\n**TASK:**\n1. Check session_status for current usage stats\n2. Read memory/token-usage.md for historical data\n3. Calculate:\n   - Today's usage (sum of logged entries for today)\n   - Past 7 days usage\n   - Past 30 days usage\n   - Total (all logged entries)\n4. Send email to mail@fxmartin.me using himalaya:\n   ```\n   cat << 'EOF' | himalaya -c ~/clawd/.himalaya/config.toml message send -a nyx\n   From: Nyx <nyx@fxmartin.me>\n   To: FX <mail@fxmartin.me>\n   Subject: Nyx Token Usage Report - [DATE]\n   Content-Type: text/plain; charset=utf-8\n\n   [REPORT]\n   EOF\n   ```\n5. Include: Summary table with usage by period, model breakdown if available, current rate limit status\n\n**After sending, update memory/token-usage.md with today's final stats.**"
+      },
+      "state": {
+        "nextRunAtMs": 1771005600000,
+        "lastRunAtMs": 1770919248763,
+        "lastStatus": "ok",
+        "lastDurationMs": 29832,
+        "consecutiveErrors": 0
+      },
+      "delivery": {
+        "mode": "none"
+      }
+    },
+    {
+      "id": "836a066d-74b0-4092-886a-909bce7d43a9",
+      "agentId": "main",
+      "name": "greek-exercise",
+      "description": "Greek language exercise (daily evenings)",
+      "enabled": true,
+      "createdAtMs": 1769452344631,
+      "updatedAtMs": 1770919388571,
+      "schedule": {
+        "kind": "cron",
+        "expr": "0 20 * * *",
+        "tz": "Europe/Athens"
+      },
+      "sessionTarget": "isolated",
+      "wakeMode": "next-heartbeat",
+      "payload": {
+        "kind": "agentTurn",
+        "message": "Greek language exercise for FX.\n\n**Create an interactive mini-lesson in French:**\n\n1. **Révision** — Quiz on 3 phrases from previous lessons (if memory/greek-progress.md exists, read it)\n\n2. **Nouvelle leçon** — Pick a practical theme:\n   - Au restaurant\n   - Dans un taxi\n   - Au supermarché\n   - Avec les voisins\n   - Au café\n   - Directions\n   - Urgences\n   - Small talk\n\n3. **Contenu:**\n   - 5 nouvelles phrases utiles\n   - Prononciation phonétique\n   - Mini-dialogue exemple\n   - Points de grammaire (un seul, simple)\n\n4. **Exercice:**\n   - Traduire 3 phrases FR→GR\n   - Demander à FX de répondre\n\n5. **Log progress** to ~/clawd/memory/greek-progress.md\n\nKeep it fun, practical, 5-10 min max. Use emoji. End with encouragement!\n\nDeliver to Telegram only."
+      },
+      "state": {
+        "nextRunAtMs": 1771005600000,
+        "lastRunAtMs": 1770919278595,
+        "lastStatus": "ok",
+        "lastDurationMs": 109976,
+        "consecutiveErrors": 0
+      },
+      "delivery": {
+        "mode": "announce",
+        "channel": "telegram",
+        "to": "8332440542"
+      }
+    },
+    {
+      "id": "bf867b6b-3a0c-434b-9bf2-26f3051c6864",
+      "agentId": "main",
+      "name": "simon-willison-monitor",
+      "createdAtMs": 1769964367656,
+      "updatedAtMs": 1770922862721,
+      "schedule": {
+        "kind": "cron",
+        "expr": "0 20 * * *",
+        "tz": "Europe/Luxembourg"
+      },
+      "sessionTarget": "isolated",
+      "wakeMode": "next-heartbeat",
+      "payload": {
+        "kind": "agentTurn",
+        "message": "Monitor Simon Willison's content for AI updates:\n\n1. Fetch https://simonwillison.net/ and check for new posts (last 3 days)\n2. Check nyx@fxmartin.me for Simon Willison newsletter emails\n3. Look for topics relevant to FX:\n   - OpenClaw/Moltbook updates\n   - Claude/Anthropic news\n   - Coding agents\n   - LLM tools and techniques\n   - Ollama/local models\n\n4. If significant updates found:\n   - Save summary to ~/clawd/reports/simon-willison/YYYY-MM-DD.md\n   - Send brief to FX via Telegram with key insights\n\n5. If nothing notable, log silently.\n\nSimon is a key source for practical AI development news. Prioritize actionable insights."
+      },
+      "state": {
+        "nextRunAtMs": 1771009200000,
+        "lastRunAtMs": 1770922809043,
+        "lastStatus": "ok",
+        "lastDurationMs": 53678,
+        "consecutiveErrors": 0
+      },
+      "enabled": true,
+      "delivery": {
+        "mode": "none"
+      }
+    },
+    {
+      "id": "c0bd4096-875c-4f4f-89e7-a8bb11baf873",
+      "agentId": "main",
+      "name": "openclaw-updates-monitor",
+      "createdAtMs": 1769948419437,
+      "updatedAtMs": 1770928217363,
+      "schedule": {
+        "kind": "cron",
+        "expr": "30 21 * * *",
+        "tz": "Europe/Luxembourg"
+      },
+      "sessionTarget": "isolated",
+      "wakeMode": "next-heartbeat",
+      "payload": {
+        "kind": "agentTurn",
+        "message": "Monitor OpenClaw updates:\n\n1. Fetch https://openclaw.ai/ and check for:\n   - New version announcements\n   - New features or capabilities\n   - Breaking changes\n   - Security advisories\n\n2. Check nyx@fxmartin.me inbox for OpenClaw mailing list emails:\n   himalaya -c ~/clawd/.himalaya/config.toml envelope list -a nyx -s 20\n   Look for emails from OpenClaw/Moltbot/Peter Steinberger\n\n3. Compare current installed version (openclaw --version) with latest\n\n4. If updates available or important news:\n   - Save to ~/clawd/reports/openclaw/YYYY-MM-DD.md\n   - Send brief summary to FX via Telegram\n   - If critical security update, recommend immediate action\n\nIf nothing new, log silently."
+      },
+      "state": {
+        "nextRunAtMs": 1771014600000,
+        "lastRunAtMs": 1770928200056,
+        "lastStatus": "ok",
+        "lastDurationMs": 17307,
+        "consecutiveErrors": 0
+      },
+      "enabled": true,
+      "delivery": {
+        "mode": "none"
+      }
+    },
+    {
+      "id": "a1a6b7f1-e7b7-4546-af5c-ca4d81757b8e",
+      "agentId": "main",
+      "name": "moltbook-daily-analysis",
+      "createdAtMs": 1769948292233,
+      "updatedAtMs": 1770930044501,
+      "schedule": {
+        "kind": "cron",
+        "expr": "0 22 * * *",
+        "tz": "Europe/Luxembourg"
+      },
+      "sessionTarget": "isolated",
+      "wakeMode": "next-heartbeat",
+      "payload": {
+        "kind": "agentTurn",
+        "message": "Run daily Moltbook analysis:\n\n1. Search for latest Moltbook news (web_search)\n2. Check for new features, security updates, or policy changes\n3. Track user/agent growth numbers if available\n4. Note interesting emergent behaviors or viral posts\n5. Monitor OpenClaw ecosystem developments\n6. Check if there are any integration opportunities for Nyx\n\nCompile findings into a brief report (~200 words). Save to ~/clawd/reports/moltbook/YYYY-MM-DD.md. If significant developments, send summary to FX via Telegram. If nothing notable, just log silently."
+      },
+      "state": {
+        "nextRunAtMs": 1771016400000,
+        "lastRunAtMs": 1770930009956,
+        "lastStatus": "ok",
+        "lastDurationMs": 34545,
+        "consecutiveErrors": 0
+      },
+      "enabled": true,
+      "delivery": {
+        "mode": "none"
+      }
+    },
+    {
+      "id": "eeb57f9c-8866-4c85-85e1-ec909b845368",
+      "agentId": "main",
+      "name": "overnight-self-improvement",
+      "enabled": true,
+      "createdAtMs": 1769897792577,
+      "updatedAtMs": 1770944544950,
+      "schedule": {
+        "kind": "cron",
+        "expr": "0 2 * * *",
+        "tz": "Europe/Luxembourg"
+      },
+      "sessionTarget": "isolated",
+      "wakeMode": "next-heartbeat",
+      "payload": {
+        "kind": "agentTurn",
+        "message": "Run the Overnight Self-Improvement Protocol. Read ~/clawd/protocols/overnight-improvement.md and follow it strictly. Research, analyze, and produce a report saved to ~/clawd/reports/self-improvement/YYYY-MM-DD.md. When complete, send the Executive Summary to FX via Telegram.",
+        "timeoutSeconds": 14400
+      },
+      "state": {
+        "nextRunAtMs": 1771030800000,
+        "lastRunAtMs": 1770944410235,
+        "lastStatus": "ok",
+        "lastDurationMs": 134715,
+        "consecutiveErrors": 0
+      },
+      "delivery": {
+        "mode": "announce",
+        "channel": "telegram",
+        "to": "8332440542"
+      }
+    },
+    {
+      "id": "7cacaeb2-1b8c-4fa8-a86a-168e00612f8f",
+      "agentId": "main",
+      "name": "daily-auto-update",
+      "description": "Auto-update OpenClaw daily",
+      "enabled": true,
+      "createdAtMs": 1769612413502,
+      "updatedAtMs": 1770951690698,
+      "schedule": {
+        "kind": "cron",
+        "expr": "0 4 * * *",
+        "tz": "Europe/Luxembourg"
+      },
+      "sessionTarget": "isolated",
+      "wakeMode": "next-heartbeat",
+      "payload": {
+        "kind": "agentTurn",
+        "message": "Run daily auto-updates:\n\n1. Check OpenClaw version: `openclaw doctor`\n2. Check for updates: `openclaw update` (if available)\n3. Report status to FX via Telegram\n\nIf updates were applied, summarize the changes. If everything is already up to date, just confirm briefly."
+      },
+      "state": {
+        "nextRunAtMs": 1771038000000,
+        "lastRunAtMs": 1770951610534,
+        "lastStatus": "ok",
+        "lastDurationMs": 80164,
+        "consecutiveErrors": 0
+      },
+      "delivery": {
+        "mode": "announce",
+        "channel": "telegram",
+        "to": "8332440542"
+      }
+    },
+    {
+      "id": "3974782f-ca0a-412a-9b5f-82d262f88df9",
+      "agentId": "main",
+      "name": "daily-security-report",
+      "description": "Daily security report email at 5am CET",
+      "enabled": true,
+      "createdAtMs": 1769435134171,
+      "updatedAtMs": 1770955223179,
+      "schedule": {
+        "kind": "cron",
+        "expr": "0 5 * * *",
+        "tz": "Europe/Luxembourg"
+      },
+      "sessionTarget": "isolated",
+      "wakeMode": "next-heartbeat",
+      "payload": {
+        "kind": "agentTurn",
+        "message": "Generate and send daily security report for nyx.\n\n**TASK:**\n1. Run ~/clawd/scripts/security-report.sh and capture output\n2. Send email to mail@fxmartin.me using himalaya:\n   ```\n   cat << 'EOF' | himalaya -c ~/clawd/.himalaya/config.toml message send -a nyx\n   From: Nyx <nyx@fxmartin.me>\n   To: FX <mail@fxmartin.me>\n   Subject: Security Report - nyx - [DATE]\n   Content-Type: text/plain; charset=utf-8\n\n   [REPORT CONTENT]\n   EOF\n   ```\n3. If concerning findings (>100 banned IPs, failed SSH), add warning header\n\nDo NOT send to Telegram - email only."
+      },
+      "state": {
+        "nextRunAtMs": 1771041600000,
+        "lastRunAtMs": 1770955200040,
+        "lastStatus": "ok",
+        "lastDurationMs": 23139,
+        "consecutiveErrors": 0
+      },
+      "delivery": {
+        "mode": "none"
+      }
+    },
+    {
+      "id": "88bbb44b-449a-4f3b-8ff3-76ca66a2d79c",
+      "agentId": "main",
+      "name": "macbook-health-check",
+      "description": "Daily MacBook Pro health check at 5am CET",
+      "enabled": true,
+      "createdAtMs": 1770571335196,
+      "updatedAtMs": 1770955275722,
+      "schedule": {
+        "kind": "cron",
+        "expr": "0 5 * * *",
+        "tz": "Europe/Luxembourg"
+      },
+      "sessionTarget": "isolated",
+      "wakeMode": "next-heartbeat",
+      "payload": {
+        "kind": "agentTurn",
+        "message": "Check MacBook Pro health and metrics for daily briefing.\n\n1. Fetch health check:\n   curl -s --connect-timeout 10 http://100.84.13.82:7780/health\n\n2. Fetch metrics:\n   curl -s --connect-timeout 10 http://100.84.13.82:7780/metrics\n\n3. Save raw data to ~/clawd/reports/mac-health/YYYY-MM-DD.json\n\n4. Create brief summary for briefing in ~/clawd/reports/mac-health/latest-summary.md:\n   - Overall status (ok/degraded/offline)\n   - Disk space warning if <20GB free\n   - Any failed services\n   - Models loaded in Ollama\n   - Memory usage (warn if <8GB available)\n   - GPU usage (note if sustained high)\n   - Thermal state (warn if not Normal)\n   - Power consumption summary\n\n5. If Mac is OFFLINE or has critical issues:\n   - Send immediate Telegram alert to FX\n\n6. If everything is OK:\n   - Just save the report silently (briefing will pick it up)\n\nThe daily briefing will read latest-summary.md and include it."
+      },
+      "delivery": {
+        "mode": "none"
+      },
+      "state": {
+        "nextRunAtMs": 1771041600000,
+        "lastRunAtMs": 1770955231585,
+        "lastStatus": "ok",
+        "lastDurationMs": 44137,
+        "consecutiveErrors": 0
+      }
+    },
+    {
+      "id": "9604e7a7-a342-496a-8601-e26565f3ae10",
+      "agentId": "main",
+      "name": "seneca-daily-wisdom",
+      "createdAtMs": 1769948826779,
+      "updatedAtMs": 1770964316518,
+      "schedule": {
+        "kind": "cron",
+        "expr": "30 7 * * *",
+        "tz": "Europe/Luxembourg"
+      },
+      "sessionTarget": "isolated",
+      "wakeMode": "next-heartbeat",
+      "payload": {
+        "kind": "agentTurn",
+        "message": "Daily Seneca Letter ritual:\n\n1. Read ~/clawd/reference/seneca/delivered.json to see which letters have been shared\n2. Read recent memory files (memory/YYYY-MM-DD.md) for context on recent conversations\n3. Consider current events, market conditions, or themes from recent exchanges\n4. Select an appropriate letter from Seneca (124 total across 3 volumes)\n5. Fetch the letter text from Wikisource: https://en.wikisource.org/wiki/Moral_letters_to_Lucilius/Letter_N\n6. Write a compelling essay (300-500 words) that:\n   - Summarizes the letter's key insight\n   - Connects it to FX's current situation or recent events\n   - Offers a provocative angle or challenge\n   - Ends with a question or call to reflection\n7. Generate audio using ElevenLabs with Bill's voice (pqHfZKP75CvOlQylNhV4):\n   curl -s \"https://api.elevenlabs.io/v1/text-to-speech/pqHfZKP75CvOlQylNhV4\" \\\n     -H \"xi-api-key: $(cat ~/.openclaw/runtime/openclaw.json | jq -r '.messages.tts.elevenlabs.apiKey')\" \\\n     -H \"Content-Type: application/json\" \\\n     -d '{\"text\": \"...\", \"model_id\": \"eleven_turbo_v2\", \"voice_settings\": {\"stability\": 0.6, \"similarity_boost\": 0.8}}' \\\n     --output /tmp/seneca-daily.mp3\n8. Update delivered.json with the letter number and theme\n9. Send text message to FX via Telegram with the letter excerpt and essay\n10. Send audio file via message tool: action=send, filePath=/tmp/seneca-daily.mp3, asVoice=true\n\nStyle: Intellectually stimulating, slightly provocative, connecting 2000-year-old wisdom to modern executive life. Not preachy. Think: a sharp friend sharing something they found meaningful."
+      },
+      "state": {
+        "nextRunAtMs": 1771050600000,
+        "lastRunAtMs": 1770964200031,
+        "lastStatus": "ok",
+        "lastDurationMs": 116487,
+        "consecutiveErrors": 0
+      },
+      "enabled": true,
+      "delivery": {
+        "mode": "announce",
+        "channel": "telegram",
+        "to": "8332440542"
+      },
+      "description": "Daily Seneca letter at 7:30am"
+    },
+    {
+      "id": "2966c873-a784-4902-8154-8a40c85f7b0a",
+      "agentId": "main",
+      "name": "birthday-fx-dayof",
+      "description": "Morning reminder for FX's Birthday",
+      "enabled": true,
+      "createdAtMs": 1769609333266,
+      "updatedAtMs": 1769609333266,
+      "schedule": {
+        "kind": "cron",
+        "expr": "0 8 14 2 *",
+        "tz": "Europe/Luxembourg"
+      },
+      "sessionTarget": "isolated",
+      "wakeMode": "next-heartbeat",
+      "payload": {
+        "kind": "agentTurn",
+        "message": "🎂 **Happy Birthday FX!**\n\nHope you have an amazing day! 🎉"
+      },
+      "state": {
+        "nextRunAtMs": 1771052400000
+      },
+      "delivery": {
+        "mode": "announce",
+        "channel": "telegram",
+        "to": "8332440542"
+      }
+    },
+    {
+      "id": "d1a97b14-4f5e-4633-8994-1ec7cc3d5d52",
+      "name": "fx-daily-briefing-weekend",
+      "description": "FX Daily Briefing (weekend 9am CET)",
+      "enabled": true,
+      "deleteAfterRun": false,
+      "createdAtMs": 1769361356093,
+      "updatedAtMs": 1770636183088,
+      "schedule": {
+        "kind": "cron",
+        "expr": "0 9 * * 0,6",
+        "tz": "Europe/Luxembourg"
+      },
+      "sessionTarget": "isolated",
+      "wakeMode": "next-heartbeat",
+      "payload": {
+        "kind": "agentTurn",
+        "message": "Generate FX Daily Briefing (weekend edition).\n\n**READ THE SKILL FIRST:** ~/clawd/skills/fx-daily-briefing/SKILL.md\n\nFollow it exactly, with weekend adjustments:\n- Slightly more relaxed tone\n- Can be lighter on news if slow weekend\n- Still include all sections\n\n**Delivery (all three):**\n- Audio voice message to Telegram\n- Written version to Telegram (markdown)\n- Email to mail@fxmartin.me via himalaya:\n  ```\n  cat << 'EOF' | himalaya -c ~/clawd/.himalaya/config.toml message send -a nyx\n  From: Nyx <nyx@fxmartin.me>\n  To: FX <mail@fxmartin.me>\n  Subject: FX Daily Briefing (Weekend) - [DATE]\n  Content-Type: text/html; charset=utf-8\n\n  [HTML BRIEFING]\n  EOF\n  ```\n- If email fails, report error to FX via Telegram immediately\n\nDeliver to Telegram chat 8332440542.",
+        "thinking": "low"
+      },
+      "state": {
+        "nextRunAtMs": 1771056000000,
+        "lastRunAtMs": 1769932800000,
+        "lastStatus": "ok",
+        "lastDurationMs": 228600
+      },
+      "delivery": {
+        "mode": "announce",
+        "channel": "telegram",
+        "to": "8332440542"
+      }
+    },
+    {
+      "id": "9032af93-c530-4c22-acd5-d823dbe89e72",
+      "agentId": "main",
+      "name": "reading-list-reminder",
+      "description": "Remind FX about unread items in reading list",
+      "enabled": true,
+      "createdAtMs": 1770487827055,
+      "updatedAtMs": 1770836483414,
+      "schedule": {
+        "kind": "cron",
+        "expr": "0 20 * * 3,6",
+        "tz": "Europe/Luxembourg"
+      },
+      "sessionTarget": "isolated",
+      "wakeMode": "next-heartbeat",
+      "payload": {
+        "kind": "agentTurn",
+        "message": "Check FX's reading list at ~/clawd/reference/reading-list/index.md.\n\nIf there are unread items:\n1. Count them\n2. Pick one that looks interesting based on tags and recency\n3. Send a casual Telegram reminder like: '📚 You have X unread articles. How about [title]? [brief 1-sentence hook from the summary]'\n\nIf all items are read, don't notify.\n\nDeliver to Telegram chat 8332440542."
+      },
+      "delivery": {
+        "mode": "announce",
+        "channel": "telegram",
+        "to": "8332440542"
+      },
+      "state": {
+        "nextRunAtMs": 1771095600000,
+        "lastRunAtMs": 1770836458082,
+        "lastStatus": "ok",
+        "lastDurationMs": 25332,
+        "consecutiveErrors": 0
+      }
+    },
+    {
+      "id": "c370cf38-fbd1-44d8-92f1-c6734447eeb9",
+      "agentId": "main",
+      "name": "calendar-sync-reminder",
+      "description": "Remind FX to send updated 2026 calendar",
+      "enabled": true,
+      "createdAtMs": 1769599536377,
+      "updatedAtMs": 1769936400000,
+      "schedule": {
+        "kind": "cron",
+        "expr": "0 10 1,15 * *",
+        "tz": "Europe/Luxembourg"
+      },
+      "sessionTarget": "isolated",
+      "wakeMode": "next-heartbeat",
+      "payload": {
+        "kind": "agentTurn",
+        "message": "📅 **Calendar sync reminder**\n\nHey FX — if you've made updates to the 2026 location calendar with Marina, send me the latest Excel so I stay current.\n\nCurrent version saved: ~/clawd/reference/2026-calendar-fx-marina.xlsx"
+      },
+      "state": {
+        "nextRunAtMs": 1771146000000,
+        "lastRunAtMs": 1769936424268,
+        "lastStatus": "ok",
+        "lastDurationMs": 5216
+      },
+      "delivery": {
+        "mode": "announce",
+        "channel": "telegram",
+        "to": "8332440542"
+      }
+    },
+    {
+      "id": "7bcfd1b9-da9c-4325-9d28-88335e177bd5",
+      "agentId": "main",
+      "name": "portfolio-reconciliation-reminder",
+      "description": "Remind FX to send portfolio screenshots for reconciliation",
+      "createdAtMs": 1769943186635,
+      "updatedAtMs": 1769943186635,
+      "schedule": {
+        "kind": "cron",
+        "expr": "0 10 1,15 * *",
+        "tz": "Europe/Luxembourg"
+      },
+      "sessionTarget": "isolated",
+      "wakeMode": "next-heartbeat",
+      "payload": {
+        "kind": "agentTurn",
+        "message": "📊 **Portfolio Reconciliation**\n\nHey FX — it's been a couple weeks. When you have a moment, send me screenshots of:\n\n1. Revolut Invest (stocks)\n2. Revolut Crypto\n\nI'll update share counts and verify my calculations match yours.\n\nCurrent tracked total: run `python3 ~/clawd/scripts/market-data.py` for latest."
+      },
+      "state": {
+        "nextRunAtMs": 1771146000000
+      },
+      "enabled": true,
+      "delivery": {
+        "mode": "announce",
+        "channel": "telegram",
+        "to": "8332440542"
+      }
+    },
+    {
+      "id": "7f250cf8-64ef-4c94-af6a-a1770deb68d7",
+      "name": "fx-daily-briefing",
+      "description": "FX Daily Briefing (weekday 6am CET)",
+      "enabled": true,
+      "deleteAfterRun": false,
+      "createdAtMs": 1769361352060,
+      "updatedAtMs": 1770959049275,
+      "schedule": {
+        "kind": "cron",
+        "expr": "0 6 * * 1-5",
+        "tz": "Europe/Luxembourg"
+      },
+      "sessionTarget": "isolated",
+      "wakeMode": "next-heartbeat",
+      "payload": {
+        "kind": "agentTurn",
+        "message": "Generate FX Daily Briefing.\n\n**READ THE SKILL FIRST:** ~/clawd/skills/fx-daily-briefing/SKILL.md\n\nFollow it exactly. Key points:\n\n1. **Data Collection:**\n   - Fetch emails from news-intake@fxmartin.me (last 24h)\n   - Fetch RSS feeds (RTL Luxembourg, Greek Reporter, Politico EU, etc.)\n   - Fetch market data (Fear & Greed, crypto, indices, watchlist)\n   - Fetch Readwise random highlight (include book + author!)\n\n2. **Processing:**\n   - Deduplicate across sources\n   - Prioritize: Finance > Regional > Tech\n   - Identify \"The Angle\" topic for US vs Europe comparison\n\n3. **Output:**\n   - Follow the exact template in SKILL.md\n   - ~800 words max for written version\n\n4. **Delivery (all three):**\n   - Audio voice message to Telegram (2-3 min, sardonic morning-radio style)\n   - Written version to Telegram (markdown)\n   - Email to mail@fxmartin.me via himalaya:\n     ```\n     cat << 'EOF' | himalaya -c ~/clawd/.himalaya/config.toml message send -a nyx\n     From: Nyx <nyx@fxmartin.me>\n     To: FX <mail@fxmartin.me>\n     Subject: FX Daily Briefing - [DATE]\n     Content-Type: text/html; charset=utf-8\n\n     [HTML BRIEFING]\n     EOF\n     ```\n   - If email fails, report error to FX via Telegram immediately\n\n5. **Archive:**\n   - Save to ~/clawd/briefings/YYYY-MM-DD.md\n\nDeliver to Telegram chat 8332440542.",
+        "thinking": "low"
+      },
+      "state": {
+        "nextRunAtMs": 1771218000000,
+        "lastRunAtMs": 1770958800045,
+        "lastStatus": "ok",
+        "lastDurationMs": 249230,
+        "consecutiveErrors": 0
+      },
+      "delivery": {
+        "mode": "announce",
+        "channel": "telegram",
+        "to": "8332440542"
+      }
+    },
+    {
+      "id": "a0d67994-67f2-46cd-8a2c-f9842cb817b2",
+      "agentId": "main",
+      "name": "remarkable-release-check",
+      "description": "Weekly check for reMarkable firmware updates",
+      "enabled": true,
+      "createdAtMs": 1770020963228,
+      "updatedAtMs": 1770022800000,
+      "schedule": {
+        "kind": "cron",
+        "expr": "0 10 * * 1",
+        "tz": "Europe/Luxembourg"
+      },
+      "sessionTarget": "isolated",
+      "wakeMode": "next-heartbeat",
+      "payload": {
+        "kind": "agentTurn",
+        "message": "Check for reMarkable firmware updates using Perplexity.\n\n1. Run Perplexity search:\n   ```\n   export $(cat ~/.secrets/perplexity.env) && node ~/clawd/skills/perplexity/scripts/search.mjs \"What is the latest reMarkable tablet firmware version released to the general public (not beta)?\" --json\n   ```\n\n2. Parse the response for the current stable version number (format: 3.XX)\n\n3. Read stored version from ~/clawd/memory/monitors/remarkable-version.txt\n\n4. If version changed:\n   - Send Telegram notification to FX with:\n     - New version number\n     - Brief summary of what's new (from Perplexity response)\n     - Link to official release notes if mentioned\n   - Update the stored version file with new version and timestamp\n\n5. If no change: Just update the 'Last checked' timestamp silently, do NOT notify FX\n\nOnly notify if there's actually a NEW version."
+      },
+      "state": {
+        "nextRunAtMs": 1771232400000,
+        "lastRunAtMs": 1770022810558,
+        "lastStatus": "ok",
+        "lastDurationMs": 26273
+      },
+      "delivery": {
+        "mode": "announce",
+        "channel": "telegram",
+        "to": "8332440542"
+      }
+    },
+    {
+      "id": "0f079d49-a1df-44a8-bf9b-69cf1ba9c8ef",
+      "agentId": "main",
+      "name": "wedding-anniversary-3weeks",
+      "description": "3 weeks reminder before Wedding Anniversary",
+      "enabled": true,
+      "createdAtMs": 1769609333283,
+      "updatedAtMs": 1769609333283,
+      "schedule": {
+        "kind": "cron",
+        "expr": "0 9 25 2 *",
+        "tz": "Europe/Luxembourg"
+      },
+      "sessionTarget": "isolated",
+      "wakeMode": "next-heartbeat",
+      "payload": {
+        "kind": "agentTurn",
+        "message": "💍 **Reminder:** Your Wedding Anniversary with Marina is in 3 weeks (18/03)!\n\nTime to plan something special."
+      },
+      "state": {
+        "nextRunAtMs": 1772006400000
+      },
+      "delivery": {
+        "mode": "announce",
+        "channel": "telegram",
+        "to": "8332440542"
+      }
+    },
+    {
+      "id": "b574915c-c6a4-4684-a834-7d15e1c90746",
+      "agentId": "main",
+      "name": "birthday-rose-3weeks",
+      "description": "3 weeks reminder before Rose's Birthday",
+      "enabled": true,
+      "createdAtMs": 1769609384153,
+      "updatedAtMs": 1769609384153,
+      "schedule": {
+        "kind": "cron",
+        "expr": "0 9 25 2 *",
+        "tz": "Europe/Luxembourg"
+      },
+      "sessionTarget": "isolated",
+      "wakeMode": "next-heartbeat",
+      "payload": {
+        "kind": "agentTurn",
+        "message": "🎂 **Reminder:** Rose VALETTE's Birthday is in 3 weeks (18/03)!\n\nTime to prepare a gift or message."
+      },
+      "state": {
+        "nextRunAtMs": 1772006400000
+      },
+      "delivery": {
+        "mode": "announce",
+        "channel": "telegram",
+        "to": "8332440542"
+      }
+    },
+    {
+      "id": "71ec570c-0f7c-4b19-8191-e87ca2efca34",
+      "agentId": "main",
+      "name": "qmd-revisit-reminder",
+      "description": "Revisit QMD for memory enhancement",
+      "deleteAfterRun": true,
+      "createdAtMs": 1769944903623,
+      "updatedAtMs": 1769944903623,
+      "schedule": {
+        "kind": "cron",
+        "expr": "0 10 1 3 *",
+        "tz": "Europe/Luxembourg"
+      },
+      "sessionTarget": "isolated",
+      "wakeMode": "next-heartbeat",
+      "payload": {
+        "kind": "agentTurn",
+        "message": "🔔 **Reminder: Revisit QMD**\n\nA month ago we parked QMD (https://github.com/tobi/qmd) — a local semantic search engine for markdown docs.\n\n**Questions to evaluate:**\n1. Has memory recall been a bottleneck?\n2. How large are the memory files now?\n3. Is the server resourced enough (RAM)?\n\n**If yes to any:** Consider installing QMD for improved semantic search over notes, docs, and memory.\n\n**Context from 2026-02-01:** Decided current `memory_search` was sufficient. Semantic memory structure just implemented."
+      },
+      "state": {
+        "nextRunAtMs": 1772355600000
+      },
+      "enabled": true,
+      "delivery": {
+        "mode": "announce",
+        "channel": "telegram",
+        "to": "8332440542"
+      }
+    },
+    {
+      "id": "2887b322-93e8-4c6f-8b38-b998c16fcfc7",
+      "agentId": "main",
+      "name": "wedding-anniversary-dayof",
+      "description": "Morning reminder for Wedding Anniversary",
+      "enabled": true,
+      "createdAtMs": 1769609333296,
+      "updatedAtMs": 1769609333296,
+      "schedule": {
+        "kind": "cron",
+        "expr": "0 8 18 3 *",
+        "tz": "Europe/Luxembourg"
+      },
+      "sessionTarget": "isolated",
+      "wakeMode": "next-heartbeat",
+      "payload": {
+        "kind": "agentTurn",
+        "message": "💍 **Happy Wedding Anniversary!**\n\nCelebrating your special day with Marina. 🥂"
+      },
+      "state": {
+        "nextRunAtMs": 1773817200000
+      },
+      "delivery": {
+        "mode": "announce",
+        "channel": "telegram",
+        "to": "8332440542"
+      }
+    },
+    {
+      "id": "174fd6dc-4146-4e69-b667-16bd7846da76",
+      "agentId": "main",
+      "name": "birthday-rose-dayof",
+      "description": "Morning reminder for Rose's Birthday",
+      "enabled": true,
+      "createdAtMs": 1769609384170,
+      "updatedAtMs": 1769609384170,
+      "schedule": {
+        "kind": "cron",
+        "expr": "0 8 18 3 *",
+        "tz": "Europe/Luxembourg"
+      },
+      "sessionTarget": "isolated",
+      "wakeMode": "next-heartbeat",
+      "payload": {
+        "kind": "agentTurn",
+        "message": "🎂 **Today is Rose VALETTE's Birthday!**\n\nDon't forget to send your wishes."
+      },
+      "state": {
+        "nextRunAtMs": 1773817200000
+      },
+      "delivery": {
+        "mode": "announce",
+        "channel": "telegram",
+        "to": "8332440542"
+      }
+    },
+    {
+      "id": "64ec9436-9cb9-45bf-b531-24e17aa1c957",
+      "agentId": "main",
+      "name": "birthday-valentine-3weeks",
+      "description": "3 weeks reminder before Valentine's Birthday",
+      "enabled": true,
+      "createdAtMs": 1769609384221,
+      "updatedAtMs": 1769609384221,
+      "schedule": {
+        "kind": "cron",
+        "expr": "0 9 27 5 *",
+        "tz": "Europe/Luxembourg"
+      },
+      "sessionTarget": "isolated",
+      "wakeMode": "next-heartbeat",
+      "payload": {
+        "kind": "agentTurn",
+        "message": "🎂 **Reminder:** Valentine JEUNE's Birthday is in 3 weeks (17/06)!\n\nTime to prepare a gift or message."
+      },
+      "state": {
+        "nextRunAtMs": 1779865200000
+      },
+      "delivery": {
+        "mode": "announce",
+        "channel": "telegram",
+        "to": "8332440542"
+      }
+    },
+    {
+      "id": "2f0ccb2c-a65e-44f9-9f60-7830e2285d0d",
+      "agentId": "main",
+      "name": "first-encounter-3weeks",
+      "description": "3 weeks reminder before First Encounter Anniversary",
+      "enabled": true,
+      "createdAtMs": 1769609333310,
+      "updatedAtMs": 1769609333310,
+      "schedule": {
+        "kind": "cron",
+        "expr": "0 9 13 6 *",
+        "tz": "Europe/Luxembourg"
+      },
+      "sessionTarget": "isolated",
+      "wakeMode": "next-heartbeat",
+      "payload": {
+        "kind": "agentTurn",
+        "message": "💕 **Reminder:** Your First Encounter anniversary with Marina is in 3 weeks (04/07)!\n\nTime to plan something romantic."
+      },
+      "state": {
+        "nextRunAtMs": 1781334000000
+      },
+      "delivery": {
+        "mode": "announce",
+        "channel": "telegram",
+        "to": "8332440542"
+      }
+    },
+    {
+      "id": "031a11e8-69a5-4264-8e6e-ab3246365d4b",
+      "agentId": "main",
+      "name": "birthday-valentine-dayof",
+      "description": "Morning reminder for Valentine's Birthday",
+      "enabled": true,
+      "createdAtMs": 1769609384235,
+      "updatedAtMs": 1769609384235,
+      "schedule": {
+        "kind": "cron",
+        "expr": "0 8 17 6 *",
+        "tz": "Europe/Luxembourg"
+      },
+      "sessionTarget": "isolated",
+      "wakeMode": "next-heartbeat",
+      "payload": {
+        "kind": "agentTurn",
+        "message": "🎂 **Today is Valentine JEUNE's Birthday!**\n\nDon't forget to send your wishes."
+      },
+      "state": {
+        "nextRunAtMs": 1781676000000
+      },
+      "delivery": {
+        "mode": "announce",
+        "channel": "telegram",
+        "to": "8332440542"
+      }
+    },
+    {
+      "id": "29101fb6-56d4-42c7-8ff6-628974139395",
+      "agentId": "main",
+      "name": "nameday-marina-3weeks",
+      "description": "3 weeks reminder before Marina's Name Day",
+      "enabled": true,
+      "createdAtMs": 1769609351178,
+      "updatedAtMs": 1769609351178,
+      "schedule": {
+        "kind": "cron",
+        "expr": "0 9 26 6 *",
+        "tz": "Europe/Luxembourg"
+      },
+      "sessionTarget": "isolated",
+      "wakeMode": "next-heartbeat",
+      "payload": {
+        "kind": "agentTurn",
+        "message": "📛 **Reminder:** Marina's Name Day is in 3 weeks (17/07)!\n\nImportant in Greek culture - time to prepare."
+      },
+      "state": {
+        "nextRunAtMs": 1782457200000
+      },
+      "delivery": {
+        "mode": "announce",
+        "channel": "telegram",
+        "to": "8332440542"
+      }
+    },
+    {
+      "id": "49d6733d-2a03-4a78-8ace-3b6963644745",
+      "agentId": "main",
+      "name": "birthday-christine-3weeks",
+      "description": "3 weeks reminder before Christine's Birthday",
+      "enabled": true,
+      "createdAtMs": 1769609351219,
+      "updatedAtMs": 1769609351219,
+      "schedule": {
+        "kind": "cron",
+        "expr": "0 9 26 6 *",
+        "tz": "Europe/Luxembourg"
+      },
+      "sessionTarget": "isolated",
+      "wakeMode": "next-heartbeat",
+      "payload": {
+        "kind": "agentTurn",
+        "message": "🎂 **Reminder:** Christine's Birthday is in 3 weeks (17/07)!\n\nTime to prepare a gift or message.\n\n📧 Email: christinemartin77@gmail.com"
+      },
+      "state": {
+        "nextRunAtMs": 1782457200000
+      },
+      "delivery": {
+        "mode": "announce",
+        "channel": "telegram",
+        "to": "8332440542"
+      }
+    },
+    {
+      "id": "bd233729-5ecb-4ebf-bc2b-2ab6858de254",
+      "agentId": "main",
+      "name": "first-encounter-dayof",
+      "description": "Morning reminder for First Encounter Anniversary",
+      "enabled": true,
+      "createdAtMs": 1769609333325,
+      "updatedAtMs": 1769609333325,
+      "schedule": {
+        "kind": "cron",
+        "expr": "0 8 4 7 *",
+        "tz": "Europe/Luxembourg"
+      },
+      "sessionTarget": "isolated",
+      "wakeMode": "next-heartbeat",
+      "payload": {
+        "kind": "agentTurn",
+        "message": "💕 **Today marks when you first met Marina!**\n\nA special day to remember. 🌹"
+      },
+      "state": {
+        "nextRunAtMs": 1783144800000
+      },
+      "delivery": {
+        "mode": "announce",
+        "channel": "telegram",
+        "to": "8332440542"
+      }
+    },
+    {
+      "id": "c4d5920b-2fff-47b3-9130-2d19b544b25d",
+      "agentId": "main",
+      "name": "birthday-herve-3weeks",
+      "description": "3 weeks reminder before Hervé's Birthday",
+      "enabled": true,
+      "createdAtMs": 1769609316624,
+      "updatedAtMs": 1769609316624,
+      "schedule": {
+        "kind": "cron",
+        "expr": "0 9 7 7 *",
+        "tz": "Europe/Luxembourg"
+      },
+      "sessionTarget": "isolated",
+      "wakeMode": "next-heartbeat",
+      "payload": {
+        "kind": "agentTurn",
+        "message": "🎂 **Reminder:** Hervé's Birthday is in 3 weeks (28/07)!\n\nTime to prepare a gift or message.\n\n📧 Email: hervemartin37@gmail.com"
+      },
+      "state": {
+        "nextRunAtMs": 1783407600000
+      },
+      "delivery": {
+        "mode": "announce",
+        "channel": "telegram",
+        "to": "8332440542"
+      }
+    },
+    {
+      "id": "dd79cc95-f845-44f6-8278-f460db06813b",
+      "agentId": "main",
+      "name": "Z Fold 8 Review Reminder",
+      "createdAtMs": 1769972882370,
+      "updatedAtMs": 1769972882370,
+      "schedule": {
+        "kind": "at",
+        "at": "2026-07-14T00:00:00.000Z"
+      },
+      "sessionTarget": "main",
+      "wakeMode": "next-heartbeat",
+      "payload": {
+        "kind": "systemEvent",
+        "text": "📱 REMINDER: Z Fold 8 should be announced/released around now. FX was considering switching from iPhone 15 Pro Max + iPad Mini to a foldable. Key factors: Apple Watch dependency, iMessage (less critical since Telegram), one device vs two daily carry. Check Z Fold 8 reviews and iPhone Fold rumors, then ping FX to discuss."
+      },
+      "state": {
+        "nextRunAtMs": 1783987200000
+      },
+      "enabled": true
+    },
+    {
+      "id": "2692656d-4bea-4564-9b09-615049bd602a",
+      "agentId": "main",
+      "name": "nameday-marina-dayof",
+      "description": "Morning reminder for Marina's Name Day",
+      "enabled": true,
+      "createdAtMs": 1769609351197,
+      "updatedAtMs": 1769609351197,
+      "schedule": {
+        "kind": "cron",
+        "expr": "0 8 17 7 *",
+        "tz": "Europe/Luxembourg"
+      },
+      "sessionTarget": "isolated",
+      "wakeMode": "next-heartbeat",
+      "payload": {
+        "kind": "agentTurn",
+        "message": "📛 **Today is Marina's Name Day!**\n\nΧρόνια πολλά Marina! 🌺"
+      },
+      "state": {
+        "nextRunAtMs": 1784268000000
+      },
+      "delivery": {
+        "mode": "announce",
+        "channel": "telegram",
+        "to": "8332440542"
+      }
+    },
+    {
+      "id": "84829837-7317-4979-93d0-377e4de6cb32",
+      "agentId": "main",
+      "name": "birthday-christine-dayof",
+      "description": "Morning reminder for Christine's Birthday",
+      "enabled": true,
+      "createdAtMs": 1769609351240,
+      "updatedAtMs": 1769609351240,
+      "schedule": {
+        "kind": "cron",
+        "expr": "0 8 17 7 *",
+        "tz": "Europe/Luxembourg"
+      },
+      "sessionTarget": "isolated",
+      "wakeMode": "next-heartbeat",
+      "payload": {
+        "kind": "agentTurn",
+        "message": "🎂 **Today is Christine's Birthday!**\n\nDon't forget to send your wishes to Christine MARTIN.\n\n📧 christinemartin77@gmail.com"
+      },
+      "state": {
+        "nextRunAtMs": 1784268000000
+      },
+      "delivery": {
+        "mode": "announce",
+        "channel": "telegram",
+        "to": "8332440542"
+      }
+    },
+    {
+      "id": "d6182a3a-5945-436e-9c41-78faa021e1f5",
+      "agentId": "main",
+      "name": "birthday-france-marie-3weeks",
+      "description": "3 weeks reminder before France-Marie's Birthday",
+      "enabled": true,
+      "createdAtMs": 1769609316657,
+      "updatedAtMs": 1769609316657,
+      "schedule": {
+        "kind": "cron",
+        "expr": "0 9 25 7 *",
+        "tz": "Europe/Luxembourg"
+      },
+      "sessionTarget": "isolated",
+      "wakeMode": "next-heartbeat",
+      "payload": {
+        "kind": "agentTurn",
+        "message": "🎂 **Reminder:** France-Marie's Birthday is in 3 weeks (15/08)!\n\nTime to prepare a gift or message.\n\n📧 Email: France-marie.martin@wanadoo.fr"
+      },
+      "state": {
+        "nextRunAtMs": 1784962800000
+      },
+      "delivery": {
+        "mode": "announce",
+        "channel": "telegram",
+        "to": "8332440542"
+      }
+    },
+    {
+      "id": "32748853-ab31-425b-82b6-997e50096552",
+      "agentId": "main",
+      "name": "birthday-herve-dayof",
+      "description": "Morning reminder for Hervé's Birthday",
+      "enabled": true,
+      "createdAtMs": 1769609316642,
+      "updatedAtMs": 1769609316642,
+      "schedule": {
+        "kind": "cron",
+        "expr": "0 8 28 7 *",
+        "tz": "Europe/Luxembourg"
+      },
+      "sessionTarget": "isolated",
+      "wakeMode": "next-heartbeat",
+      "payload": {
+        "kind": "agentTurn",
+        "message": "🎂 **Today is Hervé's Birthday!**\n\nDon't forget to send your wishes to Hervé MARTIN.\n\n📧 hervemartin37@gmail.com"
+      },
+      "state": {
+        "nextRunAtMs": 1785218400000
+      },
+      "delivery": {
+        "mode": "announce",
+        "channel": "telegram",
+        "to": "8332440542"
+      }
+    },
+    {
+      "id": "7752aa69-2aff-472d-9f6a-3015ea12bd67",
+      "agentId": "main",
+      "name": "birthday-france-marie-dayof",
+      "description": "Morning reminder for France-Marie's Birthday",
+      "enabled": true,
+      "createdAtMs": 1769609316671,
+      "updatedAtMs": 1769609316671,
+      "schedule": {
+        "kind": "cron",
+        "expr": "0 8 15 8 *",
+        "tz": "Europe/Luxembourg"
+      },
+      "sessionTarget": "isolated",
+      "wakeMode": "next-heartbeat",
+      "payload": {
+        "kind": "agentTurn",
+        "message": "🎂 **Today is France-Marie's Birthday!**\n\nDon't forget to send your wishes to France-Marie MARTIN.\n\n📧 France-marie.martin@wanadoo.fr"
+      },
+      "state": {
+        "nextRunAtMs": 1786773600000
+      },
+      "delivery": {
+        "mode": "announce",
+        "channel": "telegram",
+        "to": "8332440542"
+      }
+    },
+    {
+      "id": "7c772bac-f03b-47f7-a6df-187d2a834a7a",
+      "agentId": "main",
+      "name": "birthday-charlotte-3weeks",
+      "description": "3 weeks reminder before Charlotte's Birthday",
+      "enabled": true,
+      "createdAtMs": 1769609316716,
+      "updatedAtMs": 1769609316716,
+      "schedule": {
+        "kind": "cron",
+        "expr": "0 9 25 8 *",
+        "tz": "Europe/Luxembourg"
+      },
+      "sessionTarget": "isolated",
+      "wakeMode": "next-heartbeat",
+      "payload": {
+        "kind": "agentTurn",
+        "message": "🎂 **Reminder:** Charlotte's Birthday is in 3 weeks (15/09)!\n\nTime to prepare a gift or message.\n\n📧 Email: charlotte.martin2001@gmail.com"
+      },
+      "state": {
+        "nextRunAtMs": 1787641200000
+      },
+      "delivery": {
+        "mode": "announce",
+        "channel": "telegram",
+        "to": "8332440542"
+      }
+    },
+    {
+      "id": "fa2f062a-1c59-48b0-a7d1-42fc2d7c5981",
+      "agentId": "main",
+      "name": "birthday-julie-3weeks",
+      "description": "3 weeks reminder before Julie's Birthday",
+      "enabled": true,
+      "createdAtMs": 1769609316685,
+      "updatedAtMs": 1769609316685,
+      "schedule": {
+        "kind": "cron",
+        "expr": "0 9 2 9 *",
+        "tz": "Europe/Luxembourg"
+      },
+      "sessionTarget": "isolated",
+      "wakeMode": "next-heartbeat",
+      "payload": {
+        "kind": "agentTurn",
+        "message": "🎂 **Reminder:** Julie's Birthday is in 3 weeks (23/09)!\n\nTime to prepare a gift or message.\n\n📧 Email: julie.martin1999@gmail.com"
+      },
+      "state": {
+        "nextRunAtMs": 1788332400000
+      },
+      "delivery": {
+        "mode": "announce",
+        "channel": "telegram",
+        "to": "8332440542"
+      }
+    },
+    {
+      "id": "b3297980-fb2e-4287-bf5b-5d7389c65dbd",
+      "agentId": "main",
+      "name": "birthday-karine-3weeks",
+      "description": "3 weeks reminder before Karine's Birthday",
+      "enabled": true,
+      "createdAtMs": 1769609368286,
+      "updatedAtMs": 1769609368286,
+      "schedule": {
+        "kind": "cron",
+        "expr": "0 9 10 9 *",
+        "tz": "Europe/Luxembourg"
+      },
+      "sessionTarget": "isolated",
+      "wakeMode": "next-heartbeat",
+      "payload": {
+        "kind": "agentTurn",
+        "message": "🎂 **Reminder:** Karine's Birthday is in 3 weeks (01/10)!\n\nTime to prepare a gift or message.\n\n📧 Email: karineboissinconsulting@gmail.com"
+      },
+      "state": {
+        "nextRunAtMs": 1789023600000
+      },
+      "delivery": {
+        "mode": "announce",
+        "channel": "telegram",
+        "to": "8332440542"
+      }
+    },
+    {
+      "id": "d931736a-8582-462b-b87f-da309706cc6d",
+      "agentId": "main",
+      "name": "birthday-christophe-3weeks",
+      "description": "3 weeks reminder before Christophe's Birthday",
+      "enabled": true,
+      "createdAtMs": 1769609384184,
+      "updatedAtMs": 1769609384184,
+      "schedule": {
+        "kind": "cron",
+        "expr": "0 9 11 9 *",
+        "tz": "Europe/Luxembourg"
+      },
+      "sessionTarget": "isolated",
+      "wakeMode": "next-heartbeat",
+      "payload": {
+        "kind": "agentTurn",
+        "message": "🎂 **Reminder:** Christophe JEUNE's Birthday is in 3 weeks (02/10)!\n\nTime to prepare a gift or message."
+      },
+      "state": {
+        "nextRunAtMs": 1789110000000
+      },
+      "delivery": {
+        "mode": "announce",
+        "channel": "telegram",
+        "to": "8332440542"
+      }
+    },
+    {
+      "id": "2826187a-808b-4ad5-b039-41b30eed257a",
+      "agentId": "main",
+      "name": "birthday-charlotte-dayof",
+      "description": "Morning reminder for Charlotte's Birthday",
+      "enabled": true,
+      "createdAtMs": 1769609316735,
+      "updatedAtMs": 1769609316735,
+      "schedule": {
+        "kind": "cron",
+        "expr": "0 8 15 9 *",
+        "tz": "Europe/Luxembourg"
+      },
+      "sessionTarget": "isolated",
+      "wakeMode": "next-heartbeat",
+      "payload": {
+        "kind": "agentTurn",
+        "message": "🎂 **Today is Charlotte's Birthday!**\n\nDon't forget to send your wishes to Charlotte MARTIN.\n\n📧 charlotte.martin2001@gmail.com"
+      },
+      "state": {
+        "nextRunAtMs": 1789452000000
+      },
+      "delivery": {
+        "mode": "announce",
+        "channel": "telegram",
+        "to": "8332440542"
+      }
+    },
+    {
+      "id": "c67d7427-045b-4833-9f94-56713ae22061",
+      "agentId": "main",
+      "name": "birthday-julie-dayof",
+      "description": "Morning reminder for Julie's Birthday",
+      "enabled": true,
+      "createdAtMs": 1769609316701,
+      "updatedAtMs": 1769609316701,
+      "schedule": {
+        "kind": "cron",
+        "expr": "0 8 23 9 *",
+        "tz": "Europe/Luxembourg"
+      },
+      "sessionTarget": "isolated",
+      "wakeMode": "next-heartbeat",
+      "payload": {
+        "kind": "agentTurn",
+        "message": "🎂 **Today is Julie's Birthday!**\n\nDon't forget to send your wishes to Julie MARTIN.\n\n📧 julie.martin1999@gmail.com"
+      },
+      "state": {
+        "nextRunAtMs": 1790143200000
+      },
+      "delivery": {
+        "mode": "announce",
+        "channel": "telegram",
+        "to": "8332440542"
+      }
+    },
+    {
+      "id": "36065886-7e8a-4661-bf0b-e50bf5ad7c1f",
+      "agentId": "main",
+      "name": "birthday-karine-dayof",
+      "description": "Morning reminder for Karine's Birthday",
+      "enabled": true,
+      "createdAtMs": 1769609368306,
+      "updatedAtMs": 1769609368306,
+      "schedule": {
+        "kind": "cron",
+        "expr": "0 8 1 10 *",
+        "tz": "Europe/Luxembourg"
+      },
+      "sessionTarget": "isolated",
+      "wakeMode": "next-heartbeat",
+      "payload": {
+        "kind": "agentTurn",
+        "message": "🎂 **Today is Karine's Birthday!**\n\nDon't forget to send your wishes to Karine BOISSIN.\n\n📧 karineboissinconsulting@gmail.com"
+      },
+      "state": {
+        "nextRunAtMs": 1790834400000
+      },
+      "delivery": {
+        "mode": "announce",
+        "channel": "telegram",
+        "to": "8332440542"
+      }
+    },
+    {
+      "id": "cd7384d9-aaac-4ded-b78d-9986e8c26843",
+      "agentId": "main",
+      "name": "birthday-christophe-dayof",
+      "description": "Morning reminder for Christophe's Birthday",
+      "enabled": true,
+      "createdAtMs": 1769609384199,
+      "updatedAtMs": 1769609384199,
+      "schedule": {
+        "kind": "cron",
+        "expr": "0 8 2 10 *",
+        "tz": "Europe/Luxembourg"
+      },
+      "sessionTarget": "isolated",
+      "wakeMode": "next-heartbeat",
+      "payload": {
+        "kind": "agentTurn",
+        "message": "🎂 **Today is Christophe JEUNE's Birthday!**\n\nDon't forget to send your wishes."
+      },
+      "state": {
+        "nextRunAtMs": 1790920800000
+      },
+      "delivery": {
+        "mode": "announce",
+        "channel": "telegram",
+        "to": "8332440542"
+      }
+    },
+    {
+      "id": "c3a791b1-c9f6-4e85-b562-608698a8e925",
+      "agentId": "main",
+      "name": "birthday-marie-3weeks",
+      "description": "3 weeks reminder before Marie's Birthday",
+      "enabled": true,
+      "createdAtMs": 1769609368406,
+      "updatedAtMs": 1769609368406,
+      "schedule": {
+        "kind": "cron",
+        "expr": "0 9 23 10 *",
+        "tz": "Europe/Luxembourg"
+      },
+      "sessionTarget": "isolated",
+      "wakeMode": "next-heartbeat",
+      "payload": {
+        "kind": "agentTurn",
+        "message": "🎂 **Reminder:** Marie VALETTE's Birthday is in 3 weeks (13/11)!\n\nTime to prepare a gift or message."
+      },
+      "state": {
+        "nextRunAtMs": 1792738800000
+      },
+      "delivery": {
+        "mode": "announce",
+        "channel": "telegram",
+        "to": "8332440542"
+      }
+    },
+    {
+      "id": "fe5f8e88-b94f-4d87-8373-7f235bcaf61f",
+      "agentId": "main",
+      "name": "birthday-odile-3weeks",
+      "description": "3 weeks reminder before Odile's Birthday",
+      "enabled": true,
+      "createdAtMs": 1769609368325,
+      "updatedAtMs": 1769609368325,
+      "schedule": {
+        "kind": "cron",
+        "expr": "0 9 24 10 *",
+        "tz": "Europe/Luxembourg"
+      },
+      "sessionTarget": "isolated",
+      "wakeMode": "next-heartbeat",
+      "payload": {
+        "kind": "agentTurn",
+        "message": "🎂 **Reminder:** Odile's Birthday is in 3 weeks (14/11)!\n\nTime to prepare a gift or message.\n\n📧 Email: odilemchl@gmail.com"
+      },
+      "state": {
+        "nextRunAtMs": 1792825200000
+      },
+      "delivery": {
+        "mode": "announce",
+        "channel": "telegram",
+        "to": "8332440542"
+      }
+    },
+    {
+      "id": "9c7bbed5-da8b-45cf-beba-fef99fd9a90d",
+      "agentId": "main",
+      "name": "birthday-marina-3weeks",
+      "description": "3 weeks reminder before Marina's Birthday",
+      "enabled": true,
+      "createdAtMs": 1769609333228,
+      "updatedAtMs": 1769609333228,
+      "schedule": {
+        "kind": "cron",
+        "expr": "0 9 7 11 *",
+        "tz": "Europe/Luxembourg"
+      },
+      "sessionTarget": "isolated",
+      "wakeMode": "next-heartbeat",
+      "payload": {
+        "kind": "agentTurn",
+        "message": "🎂 **Reminder:** Marina's Birthday is in 3 weeks (28/11)!\n\nTime to prepare a gift or message.\n\n📧 Email: mpolymenakou@yahoo.gr"
+      },
+      "state": {
+        "nextRunAtMs": 1794038400000
+      },
+      "delivery": {
+        "mode": "announce",
+        "channel": "telegram",
+        "to": "8332440542"
+      }
+    },
+    {
+      "id": "4b040190-e87b-43ca-8797-d4b1137abb5e",
+      "agentId": "main",
+      "name": "proposal-anniversary-3weeks",
+      "description": "3 weeks reminder before Proposal Anniversary",
+      "enabled": true,
+      "createdAtMs": 1769609384248,
+      "updatedAtMs": 1769609384248,
+      "schedule": {
+        "kind": "cron",
+        "expr": "0 9 7 11 *",
+        "tz": "Europe/Luxembourg"
+      },
+      "sessionTarget": "isolated",
+      "wakeMode": "next-heartbeat",
+      "payload": {
+        "kind": "agentTurn",
+        "message": "💎 **Reminder:** Your Proposal Anniversary with Marina is in 3 weeks (28/11)!\n\nTime to plan something special."
+      },
+      "state": {
+        "nextRunAtMs": 1794038400000
+      },
+      "delivery": {
+        "mode": "announce",
+        "channel": "telegram",
+        "to": "8332440542"
+      }
+    },
+    {
+      "id": "302d4a50-d34a-4181-8738-3ca7ce66dc27",
+      "agentId": "main",
+      "name": "birthday-jerome-3weeks",
+      "description": "3 weeks reminder before Jérôme's Birthday",
+      "enabled": true,
+      "createdAtMs": 1769609368359,
+      "updatedAtMs": 1769609368359,
+      "schedule": {
+        "kind": "cron",
+        "expr": "0 9 12 11 *",
+        "tz": "Europe/Luxembourg"
+      },
+      "sessionTarget": "isolated",
+      "wakeMode": "next-heartbeat",
+      "payload": {
+        "kind": "agentTurn",
+        "message": "🎂 **Reminder:** Jérôme's Birthday is in 3 weeks (03/12)!\n\nTime to prepare a gift or message.\n\n📧 Email: jdesvouges@gmail.com"
+      },
+      "state": {
+        "nextRunAtMs": 1794470400000
+      },
+      "delivery": {
+        "mode": "announce",
+        "channel": "telegram",
+        "to": "8332440542"
+      }
+    },
+    {
+      "id": "407726b8-3d25-4235-b6a7-028838717182",
+      "agentId": "main",
+      "name": "birthday-marie-dayof",
+      "description": "Morning reminder for Marie's Birthday",
+      "enabled": true,
+      "createdAtMs": 1769609368419,
+      "updatedAtMs": 1769609368419,
+      "schedule": {
+        "kind": "cron",
+        "expr": "0 8 13 11 *",
+        "tz": "Europe/Luxembourg"
+      },
+      "sessionTarget": "isolated",
+      "wakeMode": "next-heartbeat",
+      "payload": {
+        "kind": "agentTurn",
+        "message": "🎂 **Today is Marie VALETTE's Birthday!**\n\nDon't forget to send your wishes."
+      },
+      "state": {
+        "nextRunAtMs": 1794553200000
+      },
+      "delivery": {
+        "mode": "announce",
+        "channel": "telegram",
+        "to": "8332440542"
+      }
+    },
+    {
+      "id": "e12cb70d-42b2-4072-956e-fbd6b885cf05",
+      "agentId": "main",
+      "name": "birthday-odile-dayof",
+      "description": "Morning reminder for Odile's Birthday",
+      "enabled": true,
+      "createdAtMs": 1769609368343,
+      "updatedAtMs": 1769609368343,
+      "schedule": {
+        "kind": "cron",
+        "expr": "0 8 14 11 *",
+        "tz": "Europe/Luxembourg"
+      },
+      "sessionTarget": "isolated",
+      "wakeMode": "next-heartbeat",
+      "payload": {
+        "kind": "agentTurn",
+        "message": "🎂 **Today is Odile's Birthday!**\n\nDon't forget to send your wishes to Odile MICHEL.\n\n📧 odilemchl@gmail.com"
+      },
+      "state": {
+        "nextRunAtMs": 1794639600000
+      },
+      "delivery": {
+        "mode": "announce",
+        "channel": "telegram",
+        "to": "8332440542"
+      }
+    },
+    {
+      "id": "f4ee47a4-8422-4212-ab9a-eefe1c649719",
+      "agentId": "main",
+      "name": "birthday-marina-dayof",
+      "description": "Morning reminder for Marina's Birthday",
+      "enabled": true,
+      "createdAtMs": 1769609333240,
+      "updatedAtMs": 1769609333240,
+      "schedule": {
+        "kind": "cron",
+        "expr": "0 8 28 11 *",
+        "tz": "Europe/Luxembourg"
+      },
+      "sessionTarget": "isolated",
+      "wakeMode": "next-heartbeat",
+      "payload": {
+        "kind": "agentTurn",
+        "message": "🎂 **Today is Marina's Birthday!**\n\nDon't forget to send your wishes to Marina POLYMENAKOU.\n\n📧 mpolymenakou@yahoo.gr"
+      },
+      "state": {
+        "nextRunAtMs": 1795849200000
+      },
+      "delivery": {
+        "mode": "announce",
+        "channel": "telegram",
+        "to": "8332440542"
+      }
+    },
+    {
+      "id": "edb0336d-2c76-4ea8-a329-34b3628f7e6c",
+      "agentId": "main",
+      "name": "proposal-anniversary-dayof",
+      "description": "Morning reminder for Proposal Anniversary",
+      "enabled": true,
+      "createdAtMs": 1769609384266,
+      "updatedAtMs": 1769609384266,
+      "schedule": {
+        "kind": "cron",
+        "expr": "0 8 28 11 *",
+        "tz": "Europe/Luxembourg"
+      },
+      "sessionTarget": "isolated",
+      "wakeMode": "next-heartbeat",
+      "payload": {
+        "kind": "agentTurn",
+        "message": "💎 **Today is your Proposal Anniversary!**\n\nThe day you asked Marina to marry you. 💕"
+      },
+      "state": {
+        "nextRunAtMs": 1795849200000
+      },
+      "delivery": {
+        "mode": "announce",
+        "channel": "telegram",
+        "to": "8332440542"
+      }
+    },
+    {
+      "id": "5c5d3293-b996-4e0d-90b0-1eca4282c63a",
+      "agentId": "main",
+      "name": "birthday-patricia-3weeks",
+      "description": "3 weeks reminder before Patricia's Birthday",
+      "enabled": true,
+      "createdAtMs": 1769609351284,
+      "updatedAtMs": 1769609351284,
+      "schedule": {
+        "kind": "cron",
+        "expr": "0 9 30 11 *",
+        "tz": "Europe/Luxembourg"
+      },
+      "sessionTarget": "isolated",
+      "wakeMode": "next-heartbeat",
+      "payload": {
+        "kind": "agentTurn",
+        "message": "🎂 **Reminder:** Patricia's Birthday is in 3 weeks (21/12)!\n\nTime to prepare a gift or message.\n\n📧 Email: pnosmartin@yahoo.fr"
+      },
+      "state": {
+        "nextRunAtMs": 1796025600000
+      },
+      "delivery": {
+        "mode": "announce",
+        "channel": "telegram",
+        "to": "8332440542"
+      }
+    },
+    {
+      "id": "d8abd79b-3c1b-4ab0-9955-59631685b95c",
+      "agentId": "main",
+      "name": "birthday-sebastien-3weeks",
+      "description": "3 weeks reminder before Sébastien's Birthday",
+      "enabled": true,
+      "createdAtMs": 1769609351256,
+      "updatedAtMs": 1769609351256,
+      "schedule": {
+        "kind": "cron",
+        "expr": "0 9 1 12 *",
+        "tz": "Europe/Luxembourg"
+      },
+      "sessionTarget": "isolated",
+      "wakeMode": "next-heartbeat",
+      "payload": {
+        "kind": "agentTurn",
+        "message": "🎂 **Reminder:** Sébastien's Birthday is in 3 weeks (22/12)!\n\nTime to prepare a gift or message.\n\n📧 Email: scarlier.carlier@gmail.com"
+      },
+      "state": {
+        "nextRunAtMs": 1796112000000
+      },
+      "delivery": {
+        "mode": "announce",
+        "channel": "telegram",
+        "to": "8332440542"
+      }
+    },
+    {
+      "id": "515d4446-ce87-4c5f-bc14-08f3baec36cd",
+      "agentId": "main",
+      "name": "birthday-jerome-dayof",
+      "description": "Morning reminder for Jérôme's Birthday",
+      "enabled": true,
+      "createdAtMs": 1769609368382,
+      "updatedAtMs": 1769609368382,
+      "schedule": {
+        "kind": "cron",
+        "expr": "0 8 3 12 *",
+        "tz": "Europe/Luxembourg"
+      },
+      "sessionTarget": "isolated",
+      "wakeMode": "next-heartbeat",
+      "payload": {
+        "kind": "agentTurn",
+        "message": "🎂 **Today is Jérôme's Birthday!**\n\nDon't forget to send your wishes to Jérôme DESVOUGES.\n\n📧 jdesvouges@gmail.com"
+      },
+      "state": {
+        "nextRunAtMs": 1796281200000
+      },
+      "delivery": {
+        "mode": "announce",
+        "channel": "telegram",
+        "to": "8332440542"
+      }
+    },
+    {
+      "id": "5f8df083-ae32-427c-a1ef-c70acaeb2227",
+      "agentId": "main",
+      "name": "birthday-patricia-dayof",
+      "description": "Morning reminder for Patricia's Birthday",
+      "enabled": true,
+      "createdAtMs": 1769609351296,
+      "updatedAtMs": 1769609351296,
+      "schedule": {
+        "kind": "cron",
+        "expr": "0 8 21 12 *",
+        "tz": "Europe/Luxembourg"
+      },
+      "sessionTarget": "isolated",
+      "wakeMode": "next-heartbeat",
+      "payload": {
+        "kind": "agentTurn",
+        "message": "🎂 **Today is Patricia's Birthday!**\n\nDon't forget to send your wishes to Patricia NOSLEN.\n\n📧 pnosmartin@yahoo.fr"
+      },
+      "state": {
+        "nextRunAtMs": 1797836400000
+      },
+      "delivery": {
+        "mode": "announce",
+        "channel": "telegram",
+        "to": "8332440542"
+      }
+    },
+    {
+      "id": "9216b965-9f20-4f51-9ac0-ec60f9c8ab3c",
+      "agentId": "main",
+      "name": "birthday-sebastien-dayof",
+      "description": "Morning reminder for Sébastien's Birthday",
+      "enabled": true,
+      "createdAtMs": 1769609351272,
+      "updatedAtMs": 1769609351272,
+      "schedule": {
+        "kind": "cron",
+        "expr": "0 8 22 12 *",
+        "tz": "Europe/Luxembourg"
+      },
+      "sessionTarget": "isolated",
+      "wakeMode": "next-heartbeat",
+      "payload": {
+        "kind": "agentTurn",
+        "message": "🎂 **Today is Sébastien's Birthday!**\n\nDon't forget to send your wishes to Sébastien CARLIER.\n\n📧 scarlier.carlier@gmail.com"
+      },
+      "state": {
+        "nextRunAtMs": 1797922800000
+      },
+      "delivery": {
+        "mode": "announce",
+        "channel": "telegram",
+        "to": "8332440542"
+      }
+    },
+    {
+      "id": "6b89b687-080e-4ec1-ae1f-ab42042ff34f",
+      "agentId": "main",
+      "name": "range-rover-controle-technique",
+      "description": "Annual reminder for Range Rover contrôle technique (every Dec 28)",
+      "enabled": true,
+      "deleteAfterRun": false,
+      "createdAtMs": 1769598538845,
+      "updatedAtMs": 1769598588711,
+      "schedule": {
+        "kind": "cron",
+        "expr": "0 9 28 12 *",
+        "tz": "Europe/Luxembourg"
+      },
+      "sessionTarget": "isolated",
+      "wakeMode": "next-heartbeat",
+      "payload": {
+        "kind": "agentTurn",
+        "message": "🚗 **Reminder: Contrôle technique due for the Range Rover**\n\nIt's been 11 months since you got the car. Time to schedule the annual inspection.\n\n**What:** Contrôle technique obligatoire\n**Where:** SNCT or authorized center\n**Info:** https://guichet.public.lu/fr/citoyens/transport/transports-individuels/vehicule-motorise/controle-technique-pneumatiques/controle-technique-obligatoire-vehicule.html\n\nBook it soon to avoid last-minute rush!"
+      },
+      "state": {
+        "nextRunAtMs": 1798444800000
+      },
+      "delivery": {
+        "mode": "announce",
+        "channel": "telegram",
+        "to": "8332440542"
+      }
+    },
+    {
+      "id": "ee906452-7f04-42de-bf6c-c5a8760c835d",
+      "agentId": "main",
+      "name": "birthday-fx-3weeks",
+      "description": "3 weeks reminder before FX's Birthday",
+      "enabled": true,
+      "createdAtMs": 1769609333251,
+      "updatedAtMs": 1769609333251,
+      "schedule": {
+        "kind": "cron",
+        "expr": "0 9 24 1 *",
+        "tz": "Europe/Luxembourg"
+      },
+      "sessionTarget": "isolated",
+      "wakeMode": "next-heartbeat",
+      "payload": {
+        "kind": "agentTurn",
+        "message": "🎂 **Reminder:** Your Birthday is in 3 weeks (14/02)!\n\nTime to plan something nice for yourself."
+      },
+      "state": {
+        "nextRunAtMs": 1800777600000
+      },
+      "delivery": {
+        "mode": "announce",
+        "channel": "telegram",
+        "to": "8332440542"
+      }
+    },
+    {
+      "id": "f686359a-65fc-43cb-a219-f2611935a10a",
+      "agentId": "main",
+      "name": "tomorrow-setup-reminder",
+      "description": "Remind FX to set up email and reMarkable",
+      "enabled": true,
+      "deleteAfterRun": true,
+      "createdAtMs": 1769373404160,
+      "updatedAtMs": 1769414400000,
+      "schedule": {
+        "kind": "cron",
+        "expr": "0 10 26 1 *",
+        "tz": "Europe/Athens"
+      },
+      "sessionTarget": "isolated",
+      "wakeMode": "next-heartbeat",
+      "payload": {
+        "kind": "agentTurn",
+        "message": "🔔 Setup reminder for FX:\n\n1. **Email access** — Set up gog (Gmail CLI) with OAuth\n2. **reMarkable Paper Pro** — Try ddvk/rmapi fork or SSH access\n3. **Voice** — Set up ElevenLabs (sag skill) for voice messages\n4. **Image generation** — DALL-E 3 or other option\n5. **Readwise** — Get API token from readwise.io/access_token\n6. **News subscriptions** — Export cookies from NYT, FT, Le Monde for full article access\n\nLet me know when you're ready to configure these!"
+      },
+      "state": {
+        "nextRunAtMs": 1800950400000,
+        "lastRunAtMs": 1769414400001,
+        "lastStatus": "ok",
+        "lastDurationMs": 11082
+      },
+      "delivery": {
+        "mode": "announce",
+        "channel": "telegram",
+        "to": "8332440542"
+      }
+    },
+    {
+      "id": "1de0c60b-e177-4eae-bbd6-63c8adedc205",
+      "agentId": "main",
+      "name": "flight-a3628-0530",
+      "description": "Flight A3628 tracking update (5:30am Greek)",
+      "enabled": true,
+      "deleteAfterRun": true,
+      "createdAtMs": 1769453844005,
+      "updatedAtMs": 1769484600001,
+      "schedule": {
+        "kind": "cron",
+        "expr": "30 3 27 1 *",
+        "tz": "UTC"
+      },
+      "sessionTarget": "isolated",
+      "wakeMode": "next-heartbeat",
+      "payload": {
+        "kind": "agentTurn",
+        "message": "Flight tracking update for FX.\n\n**Flight:** A3628 (Aegean) Athens → Luxembourg\n**Scheduled:** 08:40 Greek time departure\n\n1. Check OpenSky API for callsign AEE628 or AEE3628:\n   curl -s 'https://opensky-network.org/api/states/all' | jq '.states[] | select(.[1] | test(\"AEE.*628\"))'\n\n2. Check FlightRadar24 or FlightAware for A3628 status\n\n3. Report to Telegram:\n   - Current status (scheduled/boarding/taxiing/departed/etc.)\n   - Any delays\n   - Gate info if available\n   - Weather at Athens Airport\n\nThis is update 1 of 7 (5:30am Greek). Next update in 30 min."
+      },
+      "state": {
+        "nextRunAtMs": 1801020600000,
+        "lastRunAtMs": 1769484600001,
+        "lastStatus": "ok",
+        "lastDurationMs": 38947
+      },
+      "delivery": {
+        "mode": "announce",
+        "channel": "telegram",
+        "to": "8332440542"
+      }
+    },
+    {
+      "id": "061b3792-5b56-4654-bb91-92ad42de3756",
+      "agentId": "main",
+      "name": "flight-a3628-0600",
+      "description": "Flight A3628 tracking update (6:00am Greek)",
+      "enabled": true,
+      "deleteAfterRun": true,
+      "createdAtMs": 1769453844029,
+      "updatedAtMs": 1769486400000,
+      "schedule": {
+        "kind": "cron",
+        "expr": "0 4 27 1 *",
+        "tz": "UTC"
+      },
+      "sessionTarget": "isolated",
+      "wakeMode": "next-heartbeat",
+      "payload": {
+        "kind": "agentTurn",
+        "message": "Flight tracking update for FX.\n\n**Flight:** A3628 (Aegean) Athens → Luxembourg\n**Scheduled:** 08:40 Greek time departure\n\n1. Check OpenSky API for callsign AEE628 or AEE3628\n2. Check FlightRadar24/FlightAware for A3628 status\n3. Report: status, delays, gate info, Athens weather\n\nThis is update 2 of 7 (6:00am Greek). Next update in 30 min."
+      },
+      "state": {
+        "nextRunAtMs": 1801022400000,
+        "lastRunAtMs": 1769486437863,
+        "lastStatus": "ok",
+        "lastDurationMs": 39677
+      },
+      "delivery": {
+        "mode": "announce",
+        "channel": "telegram",
+        "to": "8332440542"
+      }
+    },
+    {
+      "id": "55f9beca-8e17-4052-b0dd-3f1304b4567f",
+      "agentId": "main",
+      "name": "flight-a3628-0630",
+      "description": "Flight A3628 tracking update (6:30am Greek)",
+      "enabled": true,
+      "deleteAfterRun": true,
+      "createdAtMs": 1769453844052,
+      "updatedAtMs": 1769488200001,
+      "schedule": {
+        "kind": "cron",
+        "expr": "30 4 27 1 *",
+        "tz": "UTC"
+      },
+      "sessionTarget": "isolated",
+      "wakeMode": "next-heartbeat",
+      "payload": {
+        "kind": "agentTurn",
+        "message": "Flight tracking update for FX.\n\n**Flight:** A3628 (Aegean) Athens → Luxembourg\n**Scheduled:** 08:40 Greek time departure\n\n1. Check OpenSky API for callsign AEE628 or AEE3628\n2. Check FlightRadar24/FlightAware for A3628 status\n3. Report: status, delays, gate info\n\nThis is update 3 of 7 (6:30am Greek). Next update in 30 min."
+      },
+      "state": {
+        "nextRunAtMs": 1801024200000,
+        "lastRunAtMs": 1769488200001,
+        "lastStatus": "ok",
+        "lastDurationMs": 57981
+      },
+      "delivery": {
+        "mode": "announce",
+        "channel": "telegram",
+        "to": "8332440542"
+      }
+    },
+    {
+      "id": "60f2d1c1-05cd-41d9-a45b-675d3fe5823c",
+      "agentId": "main",
+      "name": "flight-a3628-0700",
+      "description": "Flight A3628 tracking update (7:00am Greek)",
+      "enabled": true,
+      "deleteAfterRun": true,
+      "createdAtMs": 1769453844066,
+      "updatedAtMs": 1769490000000,
+      "schedule": {
+        "kind": "cron",
+        "expr": "0 5 27 1 *",
+        "tz": "UTC"
+      },
+      "sessionTarget": "isolated",
+      "wakeMode": "next-heartbeat",
+      "payload": {
+        "kind": "agentTurn",
+        "message": "Flight tracking update for FX.\n\n**Flight:** A3628 (Aegean) Athens → Luxembourg\n**Scheduled:** 08:40 Greek time departure\n\n1. Check OpenSky API for callsign AEE628 or AEE3628\n2. Check FlightRadar24/FlightAware for A3628 status\n3. Report: status, delays, gate info\n\nThis is update 4 of 7 (7:00am Greek). Next update in 30 min."
+      },
+      "state": {
+        "nextRunAtMs": 1801026000000,
+        "lastRunAtMs": 1769490328301,
+        "lastStatus": "ok",
+        "lastDurationMs": 49523
+      },
+      "delivery": {
+        "mode": "announce",
+        "channel": "telegram",
+        "to": "8332440542"
+      }
+    },
+    {
+      "id": "5d8419c8-d0b9-4ee2-933a-82b033f1be66",
+      "agentId": "main",
+      "name": "flight-a3628-0730",
+      "description": "Flight A3628 tracking update (7:30am Greek)",
+      "enabled": true,
+      "deleteAfterRun": true,
+      "createdAtMs": 1769453844080,
+      "updatedAtMs": 1769491800001,
+      "schedule": {
+        "kind": "cron",
+        "expr": "30 5 27 1 *",
+        "tz": "UTC"
+      },
+      "sessionTarget": "isolated",
+      "wakeMode": "next-heartbeat",
+      "payload": {
+        "kind": "agentTurn",
+        "message": "Flight tracking update for FX.\n\n**Flight:** A3628 (Aegean) Athens → Luxembourg\n**Scheduled:** 08:40 Greek time departure\n\n1. Check OpenSky API for callsign AEE628 or AEE3628\n2. Check FlightRadar24/FlightAware for A3628 status\n3. Report: status, delays, gate info\n\nThis is update 5 of 7 (7:30am Greek). Next update in 30 min."
+      },
+      "state": {
+        "nextRunAtMs": 1801027800000,
+        "lastRunAtMs": 1769491800001,
+        "lastStatus": "ok",
+        "lastDurationMs": 45492
+      },
+      "delivery": {
+        "mode": "announce",
+        "channel": "telegram",
+        "to": "8332440542"
+      }
+    },
+    {
+      "id": "beeac685-6426-4c8b-842a-4d6ea1bc5ccf",
+      "agentId": "main",
+      "name": "flight-a3628-0800",
+      "description": "Flight A3628 tracking update (8:00am Greek)",
+      "enabled": true,
+      "deleteAfterRun": true,
+      "createdAtMs": 1769453844092,
+      "updatedAtMs": 1769493600001,
+      "schedule": {
+        "kind": "cron",
+        "expr": "0 6 27 1 *",
+        "tz": "UTC"
+      },
+      "sessionTarget": "isolated",
+      "wakeMode": "next-heartbeat",
+      "payload": {
+        "kind": "agentTurn",
+        "message": "Flight tracking update for FX.\n\n**Flight:** A3628 (Aegean) Athens → Luxembourg\n**Scheduled:** 08:40 Greek time departure\n\n1. Check OpenSky API for callsign AEE628 or AEE3628\n2. Check FlightRadar24/FlightAware for A3628 status\n3. Report: status, delays, gate info\n\nThis is update 6 of 7 (8:00am Greek). Next update in 30 min — boarding should start soon."
+      },
+      "state": {
+        "nextRunAtMs": 1801029600000,
+        "lastRunAtMs": 1769493619368,
+        "lastStatus": "ok",
+        "lastDurationMs": 39766
+      },
+      "delivery": {
+        "mode": "announce",
+        "channel": "telegram",
+        "to": "8332440542"
+      }
+    },
+    {
+      "id": "66cab010-c0df-44d6-b93d-712e2d990011",
+      "agentId": "main",
+      "name": "flight-a3628-0830",
+      "description": "Flight A3628 tracking update (8:30am Greek - final)",
+      "enabled": true,
+      "deleteAfterRun": true,
+      "createdAtMs": 1769453844105,
+      "updatedAtMs": 1769495400001,
+      "schedule": {
+        "kind": "cron",
+        "expr": "30 6 27 1 *",
+        "tz": "UTC"
+      },
+      "sessionTarget": "isolated",
+      "wakeMode": "next-heartbeat",
+      "payload": {
+        "kind": "agentTurn",
+        "message": "Flight tracking update for FX — FINAL UPDATE before takeoff.\n\n**Flight:** A3628 (Aegean) Athens → Luxembourg\n**Scheduled:** 08:40 Greek time departure (10 min from now)\n\n1. Check OpenSky API for callsign AEE628 or AEE3628\n2. Check FlightRadar24/FlightAware for A3628 status\n3. Report: final status, any last-minute delays\n\nThis is update 7 of 7 (8:30am Greek). Have a safe flight! ✈️"
+      },
+      "state": {
+        "nextRunAtMs": 1801031400000,
+        "lastRunAtMs": 1769495400001,
+        "lastStatus": "ok",
+        "lastDurationMs": 33422
+      },
+      "delivery": {
+        "mode": "announce",
+        "channel": "telegram",
+        "to": "8332440542"
+      }
+    },
+    {
+      "id": "fd9ac11c-caf5-428f-a643-3ba2a5e5bafc",
+      "agentId": "main",
+      "name": "fx-landed-luxembourg",
+      "description": "Update FX location after landing in Luxembourg",
+      "enabled": true,
+      "deleteAfterRun": true,
+      "createdAtMs": 1769374423448,
+      "updatedAtMs": 1769511600001,
+      "schedule": {
+        "kind": "cron",
+        "expr": "0 12 27 1 *",
+        "tz": "Europe/Luxembourg"
+      },
+      "sessionTarget": "isolated",
+      "wakeMode": "next-heartbeat",
+      "payload": {
+        "kind": "agentTurn",
+        "message": "FX should have landed in Luxembourg by now (A3 628 from Athens).\n\n1. Update USER.md to show 'currently in Luxembourg'\n2. Send welcome message with Luxembourg weather\n3. Remind about NAS rsync setup tomorrow\n\nDeliver to Telegram."
+      },
+      "state": {
+        "nextRunAtMs": 1801047600000,
+        "lastRunAtMs": 1769511600001,
+        "lastStatus": "ok",
+        "lastDurationMs": 56805
+      },
+      "delivery": {
+        "mode": "announce",
+        "channel": "telegram",
+        "to": "8332440542"
+      }
+    },
+    {
+      "id": "44d6ffc8-5658-45cf-8bc6-8a92ef8c4fec",
+      "agentId": "main",
+      "name": "nas-rsync-reminder",
+      "description": "Remind FX to set up NAS rsync module",
+      "enabled": true,
+      "deleteAfterRun": true,
+      "createdAtMs": 1769370582900,
+      "updatedAtMs": 1769590800000,
+      "schedule": {
+        "kind": "cron",
+        "expr": "0 10 28 1 *",
+        "tz": "Europe/Luxembourg"
+      },
+      "sessionTarget": "isolated",
+      "wakeMode": "next-heartbeat",
+      "payload": {
+        "kind": "agentTurn",
+        "message": "🔔 Reminder: You're back in Luxembourg!\n\n**Setup tasks:**\n1. **NAS rsync** — TerraMaster F8: Control Panel → Services → Rsync, get module name (user: replicator)\n2. **MacBook as Node** — Set up as Clawdbot node for macOS tools:\n   ```\n   clawdbot node run --host nyx --port 18789 --display-name \"MacBook-LUX\"\n   ```\n   Then I'll approve it from Hetzner.\n\nThis gives me access to macOS features (iMessage, Shortcuts, browser, etc.) while running on cheap Hetzner!"
+      },
+      "state": {
+        "nextRunAtMs": 1801126800000,
+        "lastRunAtMs": 1769590800000,
+        "lastStatus": "ok",
+        "lastDurationMs": 20040
+      },
+      "delivery": {
+        "mode": "announce",
+        "channel": "telegram",
+        "to": "8332440542"
+      }
+    },
+    {
+      "id": "7e78c4df-bdf2-4127-98a6-30182001a0f0",
+      "agentId": "main",
+      "name": "reminder-1769612100",
+      "description": "Test the reminder skill",
+      "enabled": true,
+      "deleteAfterRun": true,
+      "createdAtMs": 1769612167786,
+      "updatedAtMs": 1769612400003,
+      "schedule": {
+        "kind": "cron",
+        "expr": "0 16 28 1 *",
+        "tz": "Europe/Luxembourg"
+      },
+      "sessionTarget": "isolated",
+      "wakeMode": "next-heartbeat",
+      "payload": {
+        "kind": "agentTurn",
+        "message": "🔔 **Reminder:** Test the reminder skill"
+      },
+      "state": {
+        "nextRunAtMs": 1801148400000,
+        "lastRunAtMs": 1769612408060,
+        "lastStatus": "ok",
+        "lastDurationMs": 5439
+      },
+      "delivery": {
+        "mode": "announce",
+        "channel": "telegram",
+        "to": "8332440542"
+      }
+    },
+    {
+      "id": "c609d3d9-3d2f-408b-9b8c-9a3471d8c2a4",
+      "agentId": "main",
+      "name": "calibre-sync-reminder",
+      "description": "Remind FX to set up permanent Calibre sync",
+      "enabled": true,
+      "deleteAfterRun": true,
+      "createdAtMs": 1769426660170,
+      "updatedAtMs": 1769623200000,
+      "schedule": {
+        "kind": "cron",
+        "expr": "0 19 28 1 *",
+        "tz": "Europe/Luxembourg"
+      },
+      "sessionTarget": "isolated",
+      "wakeMode": "next-heartbeat",
+      "payload": {
+        "kind": "agentTurn",
+        "message": "🔔 **Reminder:** Set up permanent Calibre sync\n\nYou mentioned setting up automatic sync for your Calibre metadata.db to Dropbox.\n\nOptions:\n1. **Folder Action on Mac** — Auto-upload when file changes\n2. **Cron job on Mac** — Periodic rclone sync\n3. **Hazel rule** — If you use Hazel\n\nWant me to help configure this now?"
+      },
+      "state": {
+        "nextRunAtMs": 1801159200000,
+        "lastRunAtMs": 1769623220056,
+        "lastStatus": "ok",
+        "lastDurationMs": 6682
+      },
+      "delivery": {
+        "mode": "announce",
+        "channel": "telegram",
+        "to": "8332440542"
+      }
+    },
+    {
+      "id": "ed0e21c1-a8ab-45c8-b312-dcbc26a43e22",
+      "agentId": "main",
+      "name": "zafin-call-reminder",
+      "description": "Remind FX to organize Zafin call",
+      "enabled": true,
+      "deleteAfterRun": true,
+      "createdAtMs": 1769629741699,
+      "updatedAtMs": 1769673600000,
+      "schedule": {
+        "kind": "cron",
+        "expr": "0 9 29 1 *",
+        "tz": "Europe/Luxembourg"
+      },
+      "sessionTarget": "isolated",
+      "wakeMode": "next-heartbeat",
+      "payload": {
+        "kind": "agentTurn",
+        "message": "🔔 **Reminder:** Organize a call with Zafin\n\n• **Contact:** Lionel Dourron (Zafin)\n• **Topic:** Connect with LTIMindtree sales in Italy\n\nTime to set up that intro!"
+      },
+      "state": {
+        "nextRunAtMs": 1801209600000,
+        "lastRunAtMs": 1769673615577,
+        "lastStatus": "ok",
+        "lastDurationMs": 21195
+      },
+      "delivery": {
+        "mode": "announce",
+        "channel": "telegram",
+        "to": "8332440542"
+      }
+    },
+    {
+      "id": "f1b74831-35dc-4419-94bd-db9eb36ef247",
+      "agentId": "main",
+      "name": "calibre-sync-reminder-friday",
+      "description": "Remind FX about Calibre sync setup",
+      "enabled": true,
+      "deleteAfterRun": true,
+      "createdAtMs": 1769624730828,
+      "updatedAtMs": 1769763600001,
+      "schedule": {
+        "kind": "cron",
+        "expr": "0 10 30 1 *",
+        "tz": "Europe/Luxembourg"
+      },
+      "sessionTarget": "isolated",
+      "wakeMode": "next-heartbeat",
+      "payload": {
+        "kind": "agentTurn",
+        "message": "🔔 **Reminder:** Calibre Sync Setup\n\nYou wanted to set up automatic sync for your Calibre metadata.db to Dropbox. Options:\n\n1. **Folder Action on Mac** — Triggers on file change, instant sync\n2. **Cron job on Mac** — Periodic rclone sync (every hour, etc.)\n3. **Hazel rule** — If you already use Hazel, this is clean\n\nThe Mac is where Calibre runs, so that's where the sync should originate. Ready to set this up?"
+      },
+      "state": {
+        "nextRunAtMs": 1801299600000,
+        "lastRunAtMs": 1769763614385,
+        "lastStatus": "ok",
+        "lastDurationMs": 9085
+      },
+      "delivery": {
+        "mode": "announce",
+        "channel": "telegram",
+        "to": "8332440542"
+      }
+    },
+    {
+      "id": "cca6bdee-f30c-46cc-9bc5-b844cc3da8c1",
+      "agentId": "main",
+      "name": "remarkable-setup-reminder",
+      "description": "Remind FX to set up reMarkable Paper Pro integration",
+      "enabled": true,
+      "deleteAfterRun": true,
+      "createdAtMs": 1769427687717,
+      "updatedAtMs": 1769799600000,
+      "schedule": {
+        "kind": "cron",
+        "expr": "0 20 30 1 *",
+        "tz": "Europe/Luxembourg"
+      },
+      "sessionTarget": "isolated",
+      "wakeMode": "next-heartbeat",
+      "payload": {
+        "kind": "agentTurn",
+        "message": "🔔 **Reminder:** reMarkable Paper Pro setup\n\nWe skipped this yesterday. Ready to configure?\n\nOptions:\n1. **ddvk/rmapi** — CLI tool for reMarkable cloud\n2. **SSH access** — Direct device access\n3. **reMarkable API** — Cloud sync\n\nLet me know when you want to tackle it!"
+      },
+      "state": {
+        "nextRunAtMs": 1801335600000,
+        "lastRunAtMs": 1769799600000,
+        "lastStatus": "ok",
+        "lastDurationMs": 16161
+      },
+      "delivery": {
+        "mode": "announce",
+        "channel": "telegram",
+        "to": "8332440542"
+      }
+    },
+    {
+      "id": "ea490b89-79d0-46c1-a81e-ef1277a2de91",
+      "agentId": "main",
+      "name": "google-alerts-redirect",
+      "description": "Remind FX to redirect Google Alerts to news-intake@",
+      "enabled": true,
+      "deleteAfterRun": true,
+      "createdAtMs": 1769491480583,
+      "updatedAtMs": 1769799600000,
+      "schedule": {
+        "kind": "cron",
+        "expr": "0 20 30 1 *",
+        "tz": "Europe/Luxembourg"
+      },
+      "sessionTarget": "isolated",
+      "wakeMode": "next-heartbeat",
+      "payload": {
+        "kind": "agentTurn",
+        "message": "🔔 **Reminder:** Redirect Google Alerts\n\nGo to google.com/alerts and change delivery email from martinfxavier@gmail.com → **news-intake@fxmartin.me**\n\nThis way I can pick them up in the morning briefing automatically."
+      },
+      "state": {
+        "nextRunAtMs": 1801335600000,
+        "lastRunAtMs": 1769799616163,
+        "lastStatus": "ok",
+        "lastDurationMs": 6442
+      },
+      "delivery": {
+        "mode": "announce",
+        "channel": "telegram",
+        "to": "8332440542"
+      }
+    },
+    {
+      "id": "49b8b026-b612-4bf1-ac96-e11fdb355fa0",
+      "agentId": "main",
+      "name": "reminder-1738316460",
+      "enabled": true,
+      "deleteAfterRun": true,
+      "createdAtMs": 1769892074583,
+      "updatedAtMs": 1769936400000,
+      "schedule": {
+        "kind": "cron",
+        "expr": "0 10 1 2 *",
+        "tz": "Europe/Luxembourg"
+      },
+      "sessionTarget": "isolated",
+      "wakeMode": "next-heartbeat",
+      "payload": {
+        "kind": "agentTurn",
+        "message": "🔔 **Reminder:**\n1. Test local Ollama LLM on MacBook (connect to nyx remotely)\n2. Set up Google Calendar integration (re-authorize gcalcli)\n3. Set up YouTube transcript extraction (yt-dlp)\n4. Watch & implement ideas from VelvetShark video: https://youtu.be/52kOmSQGt_E\n5. Investigate & install QMD (https://github.com/tobi/qmd) for memory enhancement"
+      },
+      "state": {
+        "nextRunAtMs": 1801472400000,
+        "lastRunAtMs": 1769936429487,
+        "lastStatus": "ok",
+        "lastDurationMs": 18271
+      },
+      "delivery": {
+        "mode": "announce",
+        "channel": "telegram",
+        "to": "8332440542"
+      }
+    }
+  ]
+}

@@ -1,0 +1,16 @@
+[Unit]
+Description=Nyx Mission Control Dashboard
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/fx/clawd/mission-control
+Environment=PORT=3333
+Environment=NODE_ENV=production
+Environment=PATH=/home/fx/.nix-profile/bin:/home/fx/.local/share/npm-global/bin:/home/fx/.local/bin:/usr/local/bin:/usr/bin:/bin
+ExecStart=/home/fx/.local/share/npm-global/bin/pnpm start -H 0.0.0.0 -p 3333
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target

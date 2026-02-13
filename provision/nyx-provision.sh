@@ -718,13 +718,16 @@ configure_service() {
 
     # Copy config files
     log_substep "Uploading service configurations"
-    remote_exec "mkdir -p /tmp/nyx-setup/config/sudoers.d"
+    remote_exec "mkdir -p /tmp/nyx-setup/config/sudoers.d /tmp/nyx-setup/scripts"
     remote_copy "${REPO_DIR}/config/openclaw.service" "/tmp/nyx-setup/config/"
     remote_copy "${REPO_DIR}/config/openclaw-runtime.mount" "/tmp/nyx-setup/config/"
     remote_copy "${REPO_DIR}/config/openclaw-start.sh" "/tmp/nyx-setup/config/"
     remote_copy "${REPO_DIR}/config/openclaw-decrypt.sh" "/tmp/nyx-setup/config/"
     remote_copy "${REPO_DIR}/config/sops-decrypt-config" "/tmp/nyx-setup/config/"
     remote_copy "${REPO_DIR}/config/sudoers.d/openclaw-decrypt" "/tmp/nyx-setup/config/sudoers.d/"
+    remote_copy "${REPO_DIR}/config/mission-control.service" "/tmp/nyx-setup/config/"
+    remote_copy "${REPO_DIR}/scripts/mc-log.sh" "/tmp/nyx-setup/scripts/"
+    remote_copy "${REPO_DIR}/scripts/mc-refresh-cron.sh" "/tmp/nyx-setup/scripts/"
 
     remote_exec "bash -s" <<'SCRIPT'
 set -e
@@ -1026,6 +1029,79 @@ echo "Tracked package installation complete"
 SCRIPT
 
     log_success "Tracked packages installed"
+}
+
+# ============================================
+# Phase 7.6: Mission Control Dashboard
+# ============================================
+
+setup_mission_control() {
+    log_step "Setting up Mission Control dashboard"
+
+    local MC_DIR="${TARGET_HOME}/clawd/mission-control"
+
+    # Check if mission-control exists (from workspace restore or fresh copy)
+    if ! remote_exec "test -d $MC_DIR"; then
+        log_warn "Mission Control not found at $MC_DIR — skipping"
+        return 0
+    fi
+
+    if [[ $DRY_RUN -eq 1 ]]; then
+        log_info "[DRY-RUN] Would install pnpm deps, build, and enable mission-control service"
+        return 0
+    fi
+
+    # Install pnpm dependencies and build
+    log_substep "Installing dependencies and building"
+    remote_exec "bash -s" <<'SCRIPT'
+set -e
+TARGET_USER="fx"
+TARGET_HOME="/home/$TARGET_USER"
+NIX_PROFILE="$TARGET_HOME/.nix-profile/etc/profile.d/nix.sh"
+MC_DIR="$TARGET_HOME/clawd/mission-control"
+
+su - "$TARGET_USER" -c "
+    . '$NIX_PROFILE'
+    export PATH=~/.local/share/npm-global/bin:\$PATH
+    cd $MC_DIR
+    pnpm install --frozen-lockfile
+    pnpm run build
+"
+SCRIPT
+
+    # Install systemd user service
+    log_substep "Installing systemd user service"
+    remote_exec "bash -s" <<SCRIPT
+set -e
+SERVICE_DIR="${TARGET_HOME}/.config/systemd/user"
+mkdir -p "\$SERVICE_DIR"
+cp /tmp/nyx-setup/config/mission-control.service "\$SERVICE_DIR/"
+chown -R ${TARGET_USER}:${TARGET_USER} "\$SERVICE_DIR"
+SCRIPT
+
+    # Enable and start (as user)
+    log_substep "Enabling and starting mission-control service"
+    remote_exec "bash -s" <<'SCRIPT'
+set -e
+TARGET_USER="fx"
+su - "$TARGET_USER" -c "
+    systemctl --user daemon-reload
+    systemctl --user enable mission-control
+    systemctl --user start mission-control
+"
+SCRIPT
+
+    # Install helper scripts
+    log_substep "Installing helper scripts"
+    remote_exec "bash -s" <<SCRIPT
+set -e
+cp /tmp/nyx-setup/scripts/mc-log.sh "${TARGET_HOME}/clawd/scripts/"
+cp /tmp/nyx-setup/scripts/mc-refresh-cron.sh "${TARGET_HOME}/clawd/scripts/"
+chmod 755 "${TARGET_HOME}/clawd/scripts/mc-log.sh" "${TARGET_HOME}/clawd/scripts/mc-refresh-cron.sh"
+chown ${TARGET_USER}:${TARGET_USER} "${TARGET_HOME}/clawd/scripts/mc-log.sh" "${TARGET_HOME}/clawd/scripts/mc-refresh-cron.sh"
+SCRIPT
+
+    log_success "Mission Control running on port 3333"
 }
 
 # ============================================
@@ -1492,6 +1568,7 @@ main() {
     fi
 
     install_tracked_packages  # Phase 7.5: Install packages from INSTALLED.md
+    setup_mission_control     # Phase 7.6: Mission Control dashboard
 
     setup_backups
     final_steps
