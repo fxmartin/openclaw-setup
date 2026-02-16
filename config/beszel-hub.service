@@ -1,0 +1,14 @@
+[Unit]
+Description=Beszel Hub - System Resource Monitoring Dashboard
+After=network.target
+
+[Service]
+Type=simple
+Environment=PATH=/home/fx/.nix-profile/bin:/home/fx/.local/bin:/usr/local/bin:/usr/bin:/bin
+ExecStart=/home/fx/.local/bin/beszel serve --http 0.0.0.0:8090
+WorkingDirectory=/home/fx/.beszel
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target

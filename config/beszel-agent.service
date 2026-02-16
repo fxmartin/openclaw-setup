@@ -1,0 +1,17 @@
+[Unit]
+Description=Beszel Agent - System Resource Metrics Collector
+After=network.target
+
+[Service]
+Type=simple
+Environment=PATH=/home/fx/.nix-profile/bin:/home/fx/.local/bin:/usr/local/bin:/usr/bin:/bin
+# KEY and PORT are set during installation by install-monitoring.sh
+# KEY: SSH public key from Beszel hub (base64-encoded)
+# PORT: Agent listen port (default 45876)
+EnvironmentFile=/home/fx/.config/beszel-agent.env
+ExecStart=/home/fx/.local/bin/beszel-agent
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target

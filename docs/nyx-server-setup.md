@@ -43,3 +43,12 @@
 - Service: `openclaw.service` (systemd)
 - Gateway mode: foreground (`gateway run`)
 - Auth: `gateway.auth.token` configured
+
+## Monitoring Stack
+- Beszel Hub: `beszel-hub.service` (user) — port 8090, resource dashboards
+- Beszel Agent: `beszel-agent.service` (user) — port 45876, self-monitoring
+- Uptime Kuma: `uptime-kuma.service` (user) — port 3001, service health
+- Data: `~/.beszel/`, `~/.uptime-kuma/`
+- Binaries: `~/.local/bin/beszel`, `~/.local/bin/beszel-agent`
+- Installer: `scripts/install-monitoring.sh`
+- Accessible via Tailscale only

@@ -148,6 +148,54 @@ sync_openclaw() {
     log "Openclaw sync complete"
 }
 
+sync_beszel() {
+    local src="$HOME/.beszel/"
+    local dest="dropbox:nyx-backup/beszel/"
+
+    if [[ ! -d "$src" ]]; then
+        log "WARN: Source directory does not exist: $src"
+        return 0
+    fi
+
+    log "Syncing beszel data to Dropbox..."
+
+    local rclone_opts=""
+    if [[ $DRY_RUN -eq 1 ]]; then
+        rclone_opts="--dry-run -v"
+    else
+        rclone_opts="-q"
+    fi
+
+    # shellcheck disable=SC2086
+    rclone sync "$src" "$dest" $rclone_opts 2>&1 | tee -a "$LOG_FILE"
+
+    log "Beszel sync complete"
+}
+
+sync_uptime_kuma() {
+    local src="$HOME/.uptime-kuma/data/"
+    local dest="dropbox:nyx-backup/uptime-kuma/"
+
+    if [[ ! -d "$src" ]]; then
+        log "WARN: Source directory does not exist: $src"
+        return 0
+    fi
+
+    log "Syncing uptime-kuma data to Dropbox..."
+
+    local rclone_opts=""
+    if [[ $DRY_RUN -eq 1 ]]; then
+        rclone_opts="--dry-run -v"
+    else
+        rclone_opts="-q"
+    fi
+
+    # shellcheck disable=SC2086
+    rclone sync "$src" "$dest" $rclone_opts 2>&1 | tee -a "$LOG_FILE"
+
+    log "Uptime Kuma sync complete"
+}
+
 # ============================================
 # Main
 # ============================================
@@ -213,6 +261,8 @@ main() {
     # Run backups
     sync_clawd
     sync_openclaw
+    sync_beszel
+    sync_uptime_kuma
 
     log "Dropbox backup completed successfully"
     log "========================================"

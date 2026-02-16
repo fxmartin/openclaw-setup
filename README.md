@@ -100,6 +100,7 @@ See [docs/nyx-server-setup.md](docs/nyx-server-setup.md) for full server specs.
 | OS | Ubuntu 24.04.3 LTS |
 | Access | Via Tailscale |
 | Package Manager | Nix + Home Manager |
+| Monitoring Hub | Beszel (:8090) + Uptime Kuma (:3001) |
 
 ## Bot Access
 
@@ -125,6 +126,10 @@ Nyx is accessible via Telegram. The bot token is encrypted and decrypted at star
 | System service | /etc/systemd/system/openclaw.service |
 | Tmpfs mount unit | /etc/systemd/system/home-fx-.openclaw-runtime.mount |
 | Start script | /usr/local/bin/openclaw-start.sh |
+| Beszel Hub data | ~/.beszel/ |
+| Beszel Agent config | ~/.config/beszel-agent.env |
+| Uptime Kuma | ~/.uptime-kuma/ |
+| Monitoring binaries | ~/.local/bin/beszel, ~/.local/bin/beszel-agent |
 
 ### Version
 
@@ -260,6 +265,33 @@ Note: `gateway run` runs in foreground (required for systemd).
       `gateway.auth.token` must be configured in openclaw.json.
 ```
 
+### Monitoring Stack
+
+Nyx hosts the centralised monitoring hub for all infrastructure (MacBooks, dev server, Nyx itself):
+
+```
+                         Tailscale Mesh (100.x.x.x)
+    ┌─────────────────────────────────────────────────────┐
+    │  MacBooks (×4)          Dev Server                  │
+    │  beszel-agent :45876    beszel-agent :45876          │
+    │  health-api   :7780                                  │
+    │       │                      │                       │
+    │       └──────────┬───────────┘                       │
+    │                  ▼                                   │
+    │          Nyx (100.64.138.99)                         │
+    │          beszel-hub    :8090  ← Resource dashboards  │
+    │          uptime-kuma   :3001  ← Service status page  │
+    │          beszel-agent  :45876    (self-monitoring)    │
+    │          mission-ctrl  :3333     (existing)           │
+    └─────────────────────────────────────────────────────┘
+```
+
+| Service | Port | Type | Purpose |
+|---------|------|------|---------|
+| Beszel Hub | 8090 | systemd user | CPU, memory, disk, network time-series graphs |
+| Uptime Kuma | 3001 | systemd user | HTTP/TCP endpoint monitoring, status page, alerts |
+| Beszel Agent | 45876 | systemd user | Collects and ships metrics to hub |
+
 The service runs without D-Bus warnings thanks to:
 1. `XDG_RUNTIME_DIR` and `DBUS_SESSION_BUS_ADDRESS` environment variables
 2. User lingering enabled: `loginctl enable-linger fx`
@@ -274,7 +306,7 @@ A comprehensive security audit was performed on the Nyx server. See below for fi
 
 | Component | Status | Details |
 |-----------|--------|---------|
-| **Firewall** | UFW active | Default deny, only SSH (22) + Tailscale (41641) |
+| **Firewall** | UFW active | Default deny, only SSH (22) + Tailscale (41641). Monitoring ports accessible via Tailscale only |
 | **SSH Hardening** | Keys only | `PermitRootLogin no`, `PasswordAuthentication no`, `AllowUsers fx`, `MaxAuthTries 3` |
 | **Intrusion Prevention** | Fail2ban | 92+ total bans, active monitoring |
 | **Rootkit Detection** | rkhunter | Weekly scans via cron |
@@ -329,6 +361,7 @@ WantedBy=multi-user.target
 - **Public internet**: Only SSH (protected by Fail2ban)
 - **Tailscale**: Primary access method
 - **Openclaw ports**: Bound to localhost only (127.0.0.1:18789, 18791, 18792)
+- **Monitoring ports**: Beszel Hub (8090), Uptime Kuma (3001), Beszel Agent (45876) — accessible via Tailscale only
 - **SMTP**: Port 25 explicitly blocked
 
 ### Verification Commands
@@ -433,6 +466,7 @@ sudo ./provision/nyx-import-secrets.sh --bundle /tmp/bundle.tar.gz.age
 | 7.5. Packages | Install tracked packages from INSTALLED.md |
 | 8. Tailscale | Install & connect |
 | 9. NAS Backup | Install backup script, configure cron |
+| 12. Monitoring | Beszel Hub + Agent, Uptime Kuma (systemd user services) |
 
 ### Verification
 
@@ -487,6 +521,9 @@ openclaw-setup/
 │   ├── openclaw-start.sh          # Start script (decrypt + symlink + start)
 │   ├── openclaw-decrypt.sh        # Decrypt wrapper (calls sudo)
 │   ├── sops-decrypt-config        # SOPS decrypt helper
+│   ├── beszel-hub.service         # Beszel monitoring hub (port 8090)
+│   ├── beszel-agent.service       # Beszel metrics agent (port 45876)
+│   ├── uptime-kuma.service        # Uptime Kuma service monitor (port 3001)
 │   ├── nyx-packages.txt           # Package manifest
 │   └── sudoers.d/
 │       └── openclaw-decrypt       # NOPASSWD rules
@@ -499,7 +536,8 @@ openclaw-setup/
 │   ├── nix-rollback.sh            # Rollback Nix generation
 │   ├── sync-packages.sh           # Sync package manifest to server
 │   ├── setup-nas-backup.sh        # NAS backup setup helper
-│   └── install-git-hooks.sh       # One-time hook setup
+│   ├── install-git-hooks.sh       # One-time hook setup
+│   └── install-monitoring.sh      # Beszel + Uptime Kuma installer
 ├── nix/
 │   ├── flake.nix                  # Flake definition (nixpkgs 24.11)
 │   ├── flake.lock                 # Pinned versions
@@ -533,7 +571,7 @@ Daily at 3:00am via `rclone`:
 ### 2. NAS Backup (Secondary)
 
 Daily at 3:30am via rsync daemon over Tailscale:
-- Syncs `~/clawd/` and `~/.openclaw/` to Terramaster F8 SSD NAS
+- Syncs `~/clawd/`, `~/.openclaw/`, `~/.beszel/`, and `~/.uptime-kuma/data/` to Terramaster F8 SSD NAS
 - Script: `/home/fx/backup-to-nas.sh`
 - Telegram alert on failure
 
@@ -593,6 +631,8 @@ cat ~/backup-nas.log
 30 3 * * * /home/fx/backup-to-nas.sh
 0 4 * * 0 /home/fx/security-scan.sh
 ```
+
+Both backup scripts include monitoring data directories (`~/.beszel/` and `~/.uptime-kuma/data/`).
 
 ## Nix Package Management
 

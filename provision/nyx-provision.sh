@@ -1303,6 +1303,54 @@ SCRIPT
 }
 
 # ============================================
+# Phase 12: Monitoring Stack
+# ============================================
+
+setup_monitoring() {
+    log_step "Setting up monitoring stack (Beszel + Uptime Kuma)"
+
+    if [[ $DRY_RUN -eq 1 ]]; then
+        log_info "[DRY-RUN] Would install: Beszel Hub (:8090), Beszel Agent (:45876), Uptime Kuma (:3001)"
+        return 0
+    fi
+
+    # Copy install script and service files
+    log_substep "Uploading monitoring configuration"
+    remote_exec "mkdir -p /tmp/nyx-setup/scripts /tmp/nyx-setup/config"
+    remote_copy "${REPO_DIR}/scripts/install-monitoring.sh" "/tmp/nyx-setup/scripts/"
+    remote_copy "${REPO_DIR}/config/beszel-hub.service" "/tmp/nyx-setup/config/"
+    remote_copy "${REPO_DIR}/config/beszel-agent.service" "/tmp/nyx-setup/config/"
+    remote_copy "${REPO_DIR}/config/uptime-kuma.service" "/tmp/nyx-setup/config/"
+
+    # Run install script as user (systemd user services)
+    log_substep "Installing monitoring stack"
+    remote_exec "bash -s" <<'SCRIPT'
+set -e
+TARGET_USER="fx"
+TARGET_HOME="/home/$TARGET_USER"
+
+# Copy config files for the install script to find
+cp /tmp/nyx-setup/config/beszel-hub.service "$TARGET_HOME/.config/systemd/user/" 2>/dev/null || true
+cp /tmp/nyx-setup/config/beszel-agent.service "$TARGET_HOME/.config/systemd/user/" 2>/dev/null || true
+cp /tmp/nyx-setup/config/uptime-kuma.service "$TARGET_HOME/.config/systemd/user/" 2>/dev/null || true
+chown -R "$TARGET_USER:$TARGET_USER" "$TARGET_HOME/.config/systemd/user/"
+
+# Install monitoring scripts
+cp /tmp/nyx-setup/scripts/install-monitoring.sh "$TARGET_HOME/install-monitoring.sh"
+chmod 755 "$TARGET_HOME/install-monitoring.sh"
+chown "$TARGET_USER:$TARGET_USER" "$TARGET_HOME/install-monitoring.sh"
+
+# Run the install script as the target user (skips agent until key is configured)
+echo "==> Running monitoring installer..."
+su - "$TARGET_USER" -c "bash $TARGET_HOME/install-monitoring.sh --skip-agent"
+
+echo "Monitoring stack installation complete"
+SCRIPT
+
+    log_success "Monitoring stack installed (Beszel Hub :8090, Uptime Kuma :3001)"
+    log_warn "Beszel Agent needs manual KEY configuration after hub setup"
+}
+
 # ============================================
 # SSH Config Management
 # ============================================
@@ -1571,6 +1619,7 @@ main() {
     setup_mission_control     # Phase 7.6: Mission Control dashboard
 
     setup_backups
+    setup_monitoring          # Phase 12: Beszel + Uptime Kuma
     final_steps
 
     # Try to get Tailscale IP (may not be available if not authenticated yet)

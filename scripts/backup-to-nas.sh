@@ -208,6 +208,52 @@ sync_openclaw() {
     log "Sync of openclaw complete"
 }
 
+sync_beszel() {
+    local src="$HOME/.beszel/"
+    local dest="rsync://${RSYNC_USER}@${RSYNC_HOST}/${RSYNC_MODULE}/nyx/beszel/"
+
+    if [[ ! -d "$src" ]]; then
+        log "WARN: Source directory does not exist: $src"
+        return 0
+    fi
+
+    log "Syncing $src to NAS..."
+
+    local rsync_opts="-avz --delete --password-file=$RSYNC_PASSWORD_FILE"
+
+    if [[ $DRY_RUN -eq 1 ]]; then
+        rsync_opts+=" --dry-run"
+    fi
+
+    # shellcheck disable=SC2086
+    rsync $rsync_opts "$src" "$dest" 2>&1 | tee -a "$LOG_FILE"
+
+    log "Sync of beszel complete"
+}
+
+sync_uptime_kuma() {
+    local src="$HOME/.uptime-kuma/data/"
+    local dest="rsync://${RSYNC_USER}@${RSYNC_HOST}/${RSYNC_MODULE}/nyx/uptime-kuma/"
+
+    if [[ ! -d "$src" ]]; then
+        log "WARN: Source directory does not exist: $src"
+        return 0
+    fi
+
+    log "Syncing $src to NAS..."
+
+    local rsync_opts="-avz --delete --password-file=$RSYNC_PASSWORD_FILE"
+
+    if [[ $DRY_RUN -eq 1 ]]; then
+        rsync_opts+=" --dry-run"
+    fi
+
+    # shellcheck disable=SC2086
+    rsync $rsync_opts "$src" "$dest" 2>&1 | tee -a "$LOG_FILE"
+
+    log "Sync of uptime-kuma complete"
+}
+
 # ============================================
 # Main
 # ============================================
@@ -303,6 +349,8 @@ Rsync connection test failed"
     # Run backups
     sync_clawd
     sync_openclaw
+    sync_beszel
+    sync_uptime_kuma
 
     log "NAS backup completed successfully"
     log "========================================"

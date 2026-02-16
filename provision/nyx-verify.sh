@@ -599,6 +599,63 @@ verify_nix_packages() {
     done
 }
 
+verify_monitoring() {
+    log_step "Monitoring Stack"
+
+    # Beszel Hub
+    if run_as_user "test -f ~/.local/bin/beszel"; then
+        check_pass "Beszel hub binary installed"
+
+        if run_as_user "systemctl --user is-active beszel-hub" &>/dev/null; then
+            check_pass "Beszel hub service running"
+
+            # Check if hub responds on port 8090
+            if run_as_user "curl -s --connect-timeout 3 http://localhost:8090/api/health" &>/dev/null; then
+                check_pass "Beszel hub responding on port 8090"
+            else
+                check_warn "Beszel hub not responding on port 8090"
+            fi
+        else
+            check_warn "Beszel hub service not running"
+        fi
+    else
+        check_warn "Beszel hub not installed"
+    fi
+
+    # Beszel Agent
+    if run_as_user "test -f ~/.local/bin/beszel-agent"; then
+        check_pass "Beszel agent binary installed"
+
+        if run_as_user "systemctl --user is-active beszel-agent" &>/dev/null; then
+            check_pass "Beszel agent service running"
+        else
+            check_warn "Beszel agent service not running (KEY may need configuration)"
+        fi
+    else
+        check_warn "Beszel agent not installed"
+    fi
+
+    # Uptime Kuma
+    if run_as_user "test -f ~/.uptime-kuma/server/server.js"; then
+        check_pass "Uptime Kuma installed"
+
+        if run_as_user "systemctl --user is-active uptime-kuma" &>/dev/null; then
+            check_pass "Uptime Kuma service running"
+
+            # Check if Uptime Kuma responds on port 3001
+            if run_as_user "curl -s --connect-timeout 3 http://localhost:3001" &>/dev/null; then
+                check_pass "Uptime Kuma responding on port 3001"
+            else
+                check_warn "Uptime Kuma not responding on port 3001"
+            fi
+        else
+            check_warn "Uptime Kuma service not running"
+        fi
+    else
+        check_warn "Uptime Kuma not installed"
+    fi
+}
+
 # ============================================
 # Summary
 # ============================================
@@ -656,6 +713,7 @@ main() {
     verify_security
     verify_software
     verify_workspace
+    verify_monitoring
 
     # Print summary
     print_summary

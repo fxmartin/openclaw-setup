@@ -11,6 +11,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Dual backup strategy (Dropbox + NAS via Tailscale)
 - Systemd service management with strict security policies
 - Declarative package management via Nix + Home Manager
+- Centralised monitoring hub (Beszel + Uptime Kuma) for all infrastructure
 
 ## Architecture
 
@@ -24,9 +25,9 @@ Layer 3: Boot Sequence      - openclaw-start.sh decrypts to tmpfs, never to disk
 
 Key insight: Secrets only exist decrypted in RAM. The tmpfs mount (`home-fx-.openclaw-runtime.mount`) ensures no disk forensics possible.
 
-### Provisioning Flow (11 Phases)
+### Provisioning Flow (12 Phases)
 
-`provision/nyx-provision.sh` orchestrates: Hetzner server creation → Base config → Security hardening → Secrets import → Package installation → Systemd setup → Workspace → Tracked packages → Mission Control → Tailscale → NAS backup → Final verification
+`provision/nyx-provision.sh` orchestrates: Hetzner server creation → Base config → Security hardening → Secrets import → Package installation → Systemd setup → Workspace → Tracked packages → Mission Control → Tailscale → NAS backup → Monitoring stack → Final verification
 
 Key insight: When `--restore-from-nas` is used, Tailscale (Phase 8) runs *before* Workspace Restore (Phase 7) since NAS is only reachable via Tailscale.
 
@@ -90,6 +91,12 @@ ls -la ~/.openclaw/runtime/       # verify secrets decrypted
 systemctl --user status mission-control
 systemctl --user restart mission-control
 journalctl --user -u mission-control -f
+
+# Monitoring stack (user services)
+systemctl --user status beszel-hub
+systemctl --user status beszel-agent
+systemctl --user status uptime-kuma
+journalctl --user -u beszel-hub -f
 ```
 
 ### Package Sync
@@ -127,6 +134,9 @@ config/             # Systemd & decryption configuration
   openclaw-decrypt.sh  # Decrypt wrapper (calls sudo)
   sops-decrypt-config  # SOPS decrypt helper
   mission-control.service # Dashboard systemd user service
+  beszel-hub.service   # Beszel monitoring hub (port 8090)
+  beszel-agent.service # Beszel metrics agent (port 45876)
+  uptime-kuma.service  # Uptime Kuma service monitor (port 3001)
   nyx-packages.txt     # Package manifest
 
 scripts/            # Operational scripts
@@ -139,6 +149,7 @@ scripts/            # Operational scripts
   sync-packages.sh     # Sync package manifest to server
   setup-nas-backup.sh  # NAS backup setup helper
   install-git-hooks.sh # One-time hook setup
+  install-monitoring.sh # Beszel + Uptime Kuma installer
   mc-log.sh            # Mission Control activity logger
   mc-refresh-cron.sh   # Mission Control cron data refresh
 
@@ -167,6 +178,10 @@ tests/              # Integration tests
 - Systemd service: `/etc/systemd/system/openclaw.service`
 - Start script: `/usr/local/bin/openclaw-start.sh`
 - AGE key (root): `/root/.config/sops/age/keys.txt`
+- Beszel hub data: `~/.beszel/`
+- Beszel agent config: `~/.config/beszel-agent.env`
+- Uptime Kuma: `~/.uptime-kuma/`
+- Monitoring binaries: `~/.local/bin/beszel`, `~/.local/bin/beszel-agent`
 
 ### Bash Script Conventions
 
@@ -205,7 +220,7 @@ Utilities: `spinner()` (animated wait), `confirm()` (y/n prompt), `require_root`
 
 ## Security Model
 
-- **Network**: UFW default-deny, only SSH (22) + Tailscale (41641)
+- **Network**: UFW default-deny, only SSH (22) + Tailscale (41641). Monitoring ports (8090, 3001, 45876) accessible only via Tailscale
 - **SSH**: Key-only, root disabled, max 3 auth attempts, AllowUsers: fx
 - **Runtime**: Secrets in tmpfs (RAM-only), never written to disk
-- **Monitoring**: Fail2ban, rkhunter weekly scans, unattended security upgrades
+- **Monitoring**: Fail2ban, rkhunter weekly scans, unattended security upgrades, Beszel (resource metrics), Uptime Kuma (service health)

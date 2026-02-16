@@ -444,6 +444,15 @@ pnpm dev              # Development mode with hot reload
 
 Port 3333 is only accessible via Tailscale — not exposed to the public internet.
 
+### Related Monitoring Dashboards
+
+| Service | URL (Tailscale) | Purpose |
+|---------|-----------------|---------|
+| Beszel Hub | `http://100.64.138.99:8090` | System resource dashboards (CPU, RAM, disk, network) |
+| Uptime Kuma | `http://100.64.138.99:3001` | Service availability monitoring and status page |
+
+These run as separate systemd user services on Nyx alongside Mission Control.
+
 ## 11. Helper Scripts
 
 ### mc-log.sh — Activity Logger

@@ -1,0 +1,14 @@
+[Unit]
+Description=Uptime Kuma - Service Availability Monitoring
+After=network.target
+
+[Service]
+Type=simple
+Environment=PATH=/home/fx/.nix-profile/bin:/home/fx/.local/bin:/home/fx/.local/share/npm-global/bin:/usr/local/bin:/usr/bin:/bin
+ExecStart=/home/fx/.nix-profile/bin/node /home/fx/.uptime-kuma/server/server.js --host 0.0.0.0 --port 3001
+WorkingDirectory=/home/fx/.uptime-kuma
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target

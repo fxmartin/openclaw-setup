@@ -42,6 +42,35 @@ Located in `~/clawd/skills/`
 | 1st & 15th monthly | Calendar sync reminder |
 | Dec 28 annually | Contrôle technique reminder |
 
+## Monitoring Services
+
+Nyx hosts the centralised monitoring hub for all infrastructure machines.
+
+| Service | Port | Type | Purpose |
+|---------|------|------|---------|
+| Beszel Hub | 8090 | systemd user | System resource dashboards (CPU, RAM, disk, network, temps) |
+| Uptime Kuma | 3001 | systemd user | HTTP/TCP endpoint health checks, status page, alerts |
+| Beszel Agent | 45876 | systemd user | Collects local metrics and ships to hub (self-monitoring) |
+
+### Monitored Systems
+
+| System | Agent | Metrics |
+|--------|-------|---------|
+| Nyx (self) | Beszel agent | CPU, RAM, disk, network |
+| MacBooks (×4) | Beszel agent (LaunchAgent) | CPU, RAM, disk, network |
+| Dev server | Beszel agent (systemd user) | CPU, RAM, disk, network |
+
+### Uptime Kuma Monitors
+
+| Monitor | Type | Target |
+|---------|------|--------|
+| MacBook health-api (×4) | HTTP | `http://<tailscale-ip>:7780/ping` |
+| Mission Control | HTTP | `http://localhost:3333` |
+| Beszel Hub | HTTP | `http://localhost:8090` |
+| Dev server SSH | TCP | `<dev-tailscale-ip>:22` |
+
+All monitoring accessible via Tailscale only (not exposed to public internet).
+
 ## Security
 
 - **sops + age** — Secrets encrypted at rest
