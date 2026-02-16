@@ -282,12 +282,20 @@ install_uptime_kuma() {
             fi
         )
     else
-        log_info "Cloning Uptime Kuma repository..."
-        git clone --depth 1 https://github.com/louislam/uptime-kuma.git "$UPTIME_KUMA_DIR"
+        # Fetch the latest release tag from GitHub API
+        local latest_tag
+        latest_tag=$(curl -fsSL https://api.github.com/repos/louislam/uptime-kuma/releases/latest | jq -r '.tag_name')
+        if [[ -z "$latest_tag" || "$latest_tag" == "null" ]]; then
+            log_error "Failed to fetch latest Uptime Kuma release tag"
+            return 1
+        fi
+        log_info "Cloning Uptime Kuma repository (tag: $latest_tag)..."
+        git clone --branch "$latest_tag" --depth 1 https://github.com/louislam/uptime-kuma.git "$UPTIME_KUMA_DIR"
         (
             cd "$UPTIME_KUMA_DIR"
-            log_info "Running npm setup..."
-            npm run setup
+            log_info "Installing production dependencies..."
+            npm ci --omit dev --no-audit
+            npm run download-dist
         )
     fi
 
