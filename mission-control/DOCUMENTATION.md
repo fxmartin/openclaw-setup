@@ -20,7 +20,7 @@ Mission Control is a web dashboard that provides visibility into all operations 
 ```
 ┌──────────────────────────────────────────────────┐
 │                   Browser (Mac)                    │
-│            http://100.115.38.12:3333              │
+│            http://nyx:3333                        │
 └──────────────────┬───────────────────────────────┘
                    │ Tailscale VPN
                    ▼
@@ -422,7 +422,7 @@ systemctl --user enable mission-control
 systemctl --user daemon-reload
 ```
 
-**Important:** The service binds to `0.0.0.0:3333` so it's accessible via Tailscale. Access from FX's Mac: `http://100.115.38.12:3333`
+**Important:** The service binds to `0.0.0.0:3333` so it's accessible via Tailscale. Access from FX's Mac: `http://nyx:3333`
 
 ### Build Process
 
@@ -439,8 +439,8 @@ pnpm dev              # Development mode with hot reload
 | From | URL |
 |------|-----|
 | nyx (local) | `http://localhost:3333` |
-| FX's Mac (Tailscale) | `http://100.115.38.12:3333` |
-| Any Tailscale device | `http://100.115.38.12:3333` |
+| FX's Mac (Tailscale) | `http://nyx:3333` |
+| Any Tailscale device | `http://nyx:3333` |
 
 Port 3333 is only accessible via Tailscale — not exposed to the public internet.
 
@@ -448,8 +448,8 @@ Port 3333 is only accessible via Tailscale — not exposed to the public interne
 
 | Service | URL (Tailscale) | Purpose |
 |---------|-----------------|---------|
-| Beszel Hub | `http://100.64.138.99:8090` | System resource dashboards (CPU, RAM, disk, network) |
-| Uptime Kuma | `http://100.64.138.99:3001` | Service availability monitoring and status page |
+| Beszel Hub | `http://nyx:8090` | System resource dashboards (CPU, RAM, disk, network) |
+| Uptime Kuma | `http://nyx:3001` | Service availability monitoring and status page |
 
 These run as separate systemd user services on Nyx alongside Mission Control.
 
@@ -521,7 +521,7 @@ cd ~/clawd/mission-control && PORT=3333 pnpm start -H 0.0.0.0 -p 3333
 ```
 
 ### "Application error" in browser
-- Ensure you're using `http://100.115.38.12:3333` (with port!)
+- Ensure you're using `http://nyx:3333` (with port!)
 - Check browser console for specific React errors
 - Common cause: API returning unexpected data types (null where string expected)
 

@@ -278,7 +278,7 @@ Nyx hosts the centralised monitoring hub for all infrastructure (MacBooks, dev s
     │       │                      │                       │
     │       └──────────┬───────────┘                       │
     │                  ▼                                   │
-    │          Nyx (100.64.138.99)                         │
+    │          Nyx (nyx)                                    │
     │          beszel-hub    :8090  ← Resource dashboards  │
     │          uptime-kuma   :3001  ← Service status page  │
     │          beszel-agent  :45876    (self-monitoring)    │

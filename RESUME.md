@@ -11,12 +11,12 @@
 
 | Server | IP (Tailscale) | SSH Key | Status | Config Path | Service Name |
 |--------|----------------|---------|--------|-------------|--------------|
-| **nyx** (prod) | 100.64.138.99 | `~/.ssh/id_nyx` | Running | `~/.clawdbot/` | `clawdbot-gateway` |
-| **nyx-dr** | 100.112.184.36 | `~/.ssh/id_nyx-dr` | **Running** | `~/.openclaw/` | `openclaw` |
+| **nyx** (prod) | nyx | `~/.ssh/id_nyx` | Running | `~/.clawdbot/` | `clawdbot-gateway` |
+| **nyx-dr** | nyx-dr | `~/.ssh/id_nyx-dr` | **Running** | `~/.openclaw/` | `openclaw` |
 
 ### What Works
 - Production nyx is running the Telegram bot (@NyxFXBot)
-- NAS backup contains all state at `rsync://100.98.9.111/Backup/nyx/`
+- NAS backup contains all state at `rsync://nas/Backup/nyx/`
   - `clawd/` - workspace
   - `clawdbot/` - original config backup
   - `openclaw/` - copy for new restore scripts
@@ -157,7 +157,7 @@ ssh nyx 'systemctl --user start clawdbot-gateway'
 
 ### Check NAS Backup Contents
 ```bash
-ssh nyx-dr 'rsync --list-only --password-file=$HOME/.rsync-nas-password "rsync://rsync-user@100.98.9.111/Backup/nyx/"'
+ssh nyx-dr 'rsync --list-only --password-file=$HOME/.rsync-nas-password "rsync://rsync-user@nas/Backup/nyx/"'
 ```
 
 ### Test NAS Connectivity
@@ -195,7 +195,7 @@ Layer 3: Boot Sequence      - openclaw-start.sh decrypts to tmpfs
 
 ### NAS Backup Structure
 ```
-rsync://100.98.9.111/Backup/nyx/
+rsync://nas/Backup/nyx/
 ├── clawd/          # Workspace (AGENTS.md, skills, briefings, etc.)
 ├── clawdbot/       # Original config backup (legacy name)
 └── openclaw/       # Config backup (new name - copy of clawdbot)

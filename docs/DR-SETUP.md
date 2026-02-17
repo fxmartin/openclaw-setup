@@ -5,7 +5,7 @@ Complete documentation for the OpenClaw/Nyx server disaster recovery architectur
 ## Overview
 
 **Server:** nyx (Hetzner Cloud CPX22)
-**IP:** 100.64.138.99 (Tailscale)
+**IP:** nyx (Tailscale MagicDNS)
 **OS:** Ubuntu 24.04 LTS
 **User:** fx
 **Package Manager:** Nix + Home Manager
@@ -104,7 +104,7 @@ echo "$(date): Backup completed" >> ~/backup.log
 
 **Schedule:** Daily at 03:30 UTC
 **Script:** `~/backup-to-nas.sh`
-**Destination:** TerraMaster NAS at 100.98.9.111 (Tailscale)
+**Destination:** TerraMaster NAS at nas (Tailscale MagicDNS)
 **Protocol:** rsync daemon on port 873
 
 **Configuration:**
