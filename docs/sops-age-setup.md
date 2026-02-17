@@ -2,35 +2,42 @@
 
 ## Overview
 
-Openclaw secrets are encrypted at rest using **age** (encryption) + **sops** (secrets management). Decryption happens automatically at gateway startup via a user systemd service.
+Openclaw secrets are encrypted at rest using **age** (encryption) + **sops** (secrets management). Decryption happens automatically at boot via a system-level systemd service that writes secrets to a tmpfs mount (RAM only).
 
 ## Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                    STARTUP (User Service)                    │
+│                    STARTUP (System Service)                   │
 │                                                              │
-│  loginctl enable-linger fx (user session persists)          │
+│  systemd starts home-fx-.openclaw-runtime.mount (tmpfs)     │
 │                          │                                   │
 │                          ▼                                   │
 │  ┌─────────────────────────────────────────────┐            │
-│  │  ExecStartPre: openclaw-decrypt.sh          │            │
-│  │    └─ sudo sops-decrypt-config              │            │
-│  │    └─ sudo age-decrypt-token                │            │
+│  │  /usr/local/bin/openclaw-start.sh (as root) │            │
+│  │  - mounts tmpfs at ~/.openclaw/runtime/     │            │
+│  │  - sops decrypt openclaw.json.enc → tmpfs   │            │
+│  │  - age decrypt telegram-bot-token.enc → tmpfs│            │
+│  │  - age decrypt himalaya, market-apis, etc.  │            │
+│  │  - creates symlinks from original paths     │            │
 │  └─────────────────────────────────────────────┘            │
-│                          │                                   │
-│        /root/.config/sops/age/keys.txt (root-only)          │
+│       Uses /root/.config/sops/age/keys.txt (root-only)      │
 │                          │                                   │
 │                          ▼                                   │
 │  Runtime decrypted files (fx-owned, 600 perms):             │
-│  - ~/.openclaw/openclaw.json                                │
-│  - ~/.secrets/telegram-bot-token                            │
+│  - ~/.openclaw/runtime/openclaw.json                        │
+│  - ~/.openclaw/runtime/telegram-bot-token                   │
+│  - ~/.openclaw/runtime/himalaya-config.toml                 │
+│  - ~/.openclaw/runtime/market-apis.json                     │
+│  - ~/.openclaw/runtime/perplexity.env                       │
+│  - ~/.openclaw/runtime/readwise.json                        │
 │                          │                                   │
 │                          ▼                                   │
-│              openclaw gateway start                          │
+│  Symlinks: ~/.openclaw/openclaw.json → runtime/openclaw.json│
+│            ~/.secrets/telegram-bot-token → runtime/...       │
 │                          │                                   │
 │                          ▼                                   │
-│        openclaw-gateway.service (user-managed, D-Bus ✓)     │
+│      exec su - fx ... openclaw gateway run (foreground)     │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -39,22 +46,33 @@ Openclaw secrets are encrypted at rest using **age** (encryption) + **sops** (se
 | File | Purpose | Permissions |
 |------|---------|-------------|
 | `/root/.config/sops/age/keys.txt` | Age private key | root:root 600 |
-| `~/.openclaw/openclaw.json.enc` | Encrypted config | fx:fx 644 |
-| `~/.secrets/telegram-bot-token.enc` | Encrypted telegram token | fx:fx 644 |
+| `~/.openclaw/openclaw.json.enc` | SOPS encrypted config | fx:fx 644 |
+| `~/.secrets/telegram-bot-token.enc` | AGE encrypted token | fx:fx 644 |
+| `~/.secrets/himalaya-config.toml.enc` | AGE encrypted email config | fx:fx 644 |
+| `~/.secrets/market-apis.json.enc` | AGE encrypted market API keys | fx:fx 644 |
+| `~/.secrets/perplexity.env.enc` | AGE encrypted Perplexity key | fx:fx 644 |
+| `~/.secrets/readwise.json.enc` | AGE encrypted Readwise token | fx:fx 644 |
+| `~/.secrets/rclone.conf.enc` | AGE encrypted rclone config | fx:fx 644 |
 | `~/.openclaw/.sops.yaml` | SOPS config (which fields to encrypt) | fx:fx 644 |
-| `/usr/local/bin/openclaw-decrypt.sh` | Decrypt wrapper (calls sudo) | root:root 755 |
-| `/usr/local/bin/sops-decrypt-config` | SOPS decrypt helper | root:root 755 |
-| `/usr/local/bin/age-decrypt-token` | Age decrypt helper | root:root 755 |
-| `/etc/sudoers.d/openclaw-decrypt` | NOPASSWD rules for decrypt | root:root 440 |
-| `~/.config/systemd/user/openclaw.service` | User systemd service | fx:fx 644 |
+| `/usr/local/bin/openclaw-start.sh` | Startup wrapper (decrypt + start) | root:root 755 |
+| `/etc/systemd/system/openclaw.service` | Systemd service (system-level) | root:root 644 |
+| `/etc/systemd/system/home-fx-.openclaw-runtime.mount` | tmpfs mount unit | root:root 644 |
 
-## Backup Location
+## Runtime (tmpfs)
 
-Backups stored in Dropbox (`nyx-backup/secrets/`):
-- `age/age-keys-backup.txt` — private key backup
-- `openclaw/openclaw.json.enc` — encrypted config
-- `openclaw/telegram-bot-token.enc` — encrypted token
-- `gh/hosts.yml.enc` — encrypted GitHub token
+Decrypted secrets live only in RAM at `~/.openclaw/runtime/`:
+
+```
+~/.openclaw/runtime/       (tmpfs, 2MB, mode 0700)
+├── openclaw.json          (decrypted main config)
+├── telegram-bot-token     (decrypted token)
+├── himalaya-config.toml   (decrypted email config)
+├── market-apis.json       (decrypted API keys)
+├── perplexity.env         (decrypted Perplexity key)
+└── readwise.json          (decrypted Readwise token)
+```
+
+On reboot, the tmpfs is wiped. Secrets are re-decrypted by `openclaw-start.sh` at service startup.
 
 ## Key Commands
 
@@ -74,7 +92,7 @@ sudo SOPS_AGE_KEY_FILE=/root/.config/sops/age/keys.txt \
 sudo age -d -i /root/.config/sops/age/keys.txt ~/.secrets/telegram-bot-token.enc
 ```
 
-### Edit encrypted config (decrypt → edit → re-encrypt)
+### Edit encrypted config (decrypt, edit, re-encrypt)
 ```bash
 sudo SOPS_AGE_KEY_FILE=/root/.config/sops/age/keys.txt \
   sops ~/.openclaw/openclaw.json.enc
@@ -82,86 +100,77 @@ sudo SOPS_AGE_KEY_FILE=/root/.config/sops/age/keys.txt \
 
 ### Restart openclaw
 ```bash
-systemctl --user restart openclaw.service
-systemctl --user status openclaw-gateway.service
+sudo systemctl restart openclaw
+sudo systemctl status openclaw
 ```
 
-## User Service Setup
+## Systemd Service
 
-### Enable lingering
-```bash
-sudo loginctl enable-linger fx
-```
-
-### User service file
-`~/.config/systemd/user/openclaw.service`:
+`/etc/systemd/system/openclaw.service`:
 ```ini
 [Unit]
 Description=Openclaw Gateway
-After=network-online.target
-Wants=network-online.target
+After=network.target home-fx-.openclaw-runtime.mount
+Requires=home-fx-.openclaw-runtime.mount
 
 [Service]
 Type=simple
-ExecStartPre=/usr/local/bin/openclaw-decrypt.sh
-ExecStart=/home/fx/.local/share/npm-global/bin/openclaw gateway start
+Environment="XDG_RUNTIME_DIR=/run/user/1000"
+Environment="DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus"
+ExecStart=/usr/local/bin/openclaw-start.sh
 Restart=always
 RestartSec=5
-Environment=PATH=/home/fx/.local/share/npm-global/bin:/home/fx/.local/bin:/usr/local/bin:/usr/bin:/bin
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/home/fx/.openclaw /home/fx/.secrets /home/fx/clawd /home/fx/.config/rclone
+PrivateTmp=true
+NoNewPrivileges=false
 
 [Install]
-WantedBy=default.target
+WantedBy=multi-user.target
 ```
 
-### Decrypt wrapper
-`/usr/local/bin/openclaw-decrypt.sh`:
-```bash
-#!/bin/bash
-set -e
+## tmpfs Mount Unit
 
-CONFIG_DIR=/home/fx/.openclaw
-SECRETS_DIR=/home/fx/.secrets
+`/etc/systemd/system/home-fx-.openclaw-runtime.mount`:
+```ini
+[Unit]
+Description=Openclaw Runtime Secrets (tmpfs)
+Before=openclaw.service
 
-if [ -f "$CONFIG_DIR/openclaw.json.enc" ]; then
-  sudo /usr/local/bin/sops-decrypt-config
-fi
+[Mount]
+What=tmpfs
+Where=/home/fx/.openclaw/runtime
+Type=tmpfs
+Options=nodev,nosuid,noexec,size=2M,uid=1000,gid=1000,mode=0700
 
-if [ -f "$SECRETS_DIR/telegram-bot-token.enc" ]; then
-  sudo /usr/local/bin/age-decrypt-token
-fi
-```
-
-### Sudoers config
-`/etc/sudoers.d/openclaw-decrypt`:
-```
-fx ALL=(root) NOPASSWD: /usr/local/bin/sops-decrypt-config
-fx ALL=(root) NOPASSWD: /usr/local/bin/age-decrypt-token
+[Install]
+WantedBy=multi-user.target
 ```
 
 ## Troubleshooting
 
 ### Openclaw won't start after reboot
-1. Check if user session is running:
+1. Check tmpfs mount:
    ```bash
-   loginctl user-status fx
+   mount | grep runtime
    ```
 2. Check if decryption worked:
    ```bash
-   ls -la ~/.openclaw/openclaw.json
-   ls -la ~/.secrets/telegram-bot-token
+   ls -la ~/.openclaw/runtime/
    ```
-3. Check user service logs:
+3. Check service logs:
    ```bash
-   journalctl --user -u openclaw -n 50
-   journalctl --user -u openclaw-gateway -n 50
+   sudo journalctl -u openclaw -n 50
    ```
 4. Try manual decrypt:
    ```bash
-   /usr/local/bin/openclaw-decrypt.sh
+   sudo SOPS_AGE_KEY_FILE=/root/.config/sops/age/keys.txt \
+     sops -d --output-type json ~/.openclaw/openclaw.json.enc
    ```
 
 ### Lost the age private key
-Restore from Dropbox:
+Restore from 1Password secrets bundle or Dropbox:
 ```bash
 rclone copy dropbox:nyx-backup/secrets/age/age-keys-backup.txt /tmp/
 sudo mkdir -p /root/.config/sops/age
@@ -170,23 +179,24 @@ sudo chmod 600 /root/.config/sops/age/keys.txt
 ```
 
 ### Need to add new secrets
-Edit the encrypted file directly:
-```bash
-sudo SOPS_AGE_KEY_FILE=/root/.config/sops/age/keys.txt \
-  sops ~/.openclaw/openclaw.json.enc
-```
-This decrypts, opens in $EDITOR, and re-encrypts on save.
+1. Create and encrypt the file:
+   ```bash
+   # For JSON (structured): use SOPS
+   sudo SOPS_AGE_KEY_FILE=/root/.config/sops/age/keys.txt sops -e -i file.json
+   mv file.json file.json.enc
+
+   # For plain text: use AGE
+   age -r $(sudo cat /root/.config/sops/age/keys.txt | grep "public key:" | cut -d: -f2 | tr -d ' ') \
+     -o file.enc file && shred -u file
+   ```
+2. Add decryption block to `/usr/local/bin/openclaw-start.sh`
+3. Restart: `sudo systemctl restart openclaw`
 
 ## Security Model
 
 - **Age private key**: Only readable by root
 - **Encrypted files**: Can be world-readable (useless without key)
-- **Decrypted files**: Created at startup with 600 perms, owned by fx
-- **Sudo rules**: Narrowly scoped to specific decrypt scripts only
-- **User service**: Proper D-Bus session, no privilege escalation in main process
+- **Decrypted files**: Written to tmpfs at startup with 600 perms, owned by fx
+- **tmpfs**: RAM-only filesystem, wiped on reboot, no disk forensics possible
+- **Systemd hardening**: `ProtectSystem=strict`, `ProtectHome=read-only`, `PrivateTmp=true`
 - **Threat model**: Protects against fx-user compromise; attacker would need root to get the key
-
-## Installed Tools
-
-- `age` v1.1.1 — `/usr/bin/age`
-- `sops` v3.8.1 — `/usr/local/bin/sops`

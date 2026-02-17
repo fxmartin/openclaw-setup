@@ -125,31 +125,24 @@ fi
 **Portfolio structure:**
 ```json
 {
-  "name": "FX Portfolio (Revolut)",
+  "name": "Portfolio Name",
   "currency": "EUR",
   "stocks": [
-    {"ticker": "MWOQ.DE", "name": "Amundi S&P 500 EW ESG EUR-Hedged", "shares": 387.93},
-    {"ticker": "AMEM.DE", "name": "Amundi MSCI Emerging Markets", "shares": 746.18},
-    {"ticker": "MSTR", "name": "MicroStrategy", "shares": 19.67},
-    {"ticker": "DFEN", "name": "VanEck Defense ETF 3x", "shares": 3.29},
-    {"ticker": "AAPL", "name": "Apple", "shares": 0.78}
+    {"ticker": "EXAMPLE.DE", "name": "Example ETF", "shares": 100.00},
+    {"ticker": "AAPL", "name": "Apple", "shares": 1.00}
   ],
   "crypto": {
     "main": [
-      {"symbol": "BTC", "amount": 0.042},
-      {"symbol": "XRP", "amount": 940.34},
-      {"symbol": "LINK", "amount": 59.56}
+      {"symbol": "BTC", "amount": 0.01},
+      {"symbol": "ETH", "amount": 1.00}
     ],
     "staking": [
-      {"symbol": "ETH", "amount": 0.91},
-      {"symbol": "SOL", "amount": 17.37}
+      {"symbol": "SOL", "amount": 10.00}
     ]
   },
   "dca": {
     "stocks": [
-      {"ticker": "AAPL", "amount": 100, "currency": "USD", "frequency": "weekly"},
-      {"ticker": "DFEN", "amount": 100, "currency": "EUR", "frequency": "weekly"},
-      {"ticker": "AMEM.DE", "amount": 100, "currency": "EUR", "frequency": "weekly"}
+      {"ticker": "AAPL", "amount": 100, "currency": "USD", "frequency": "weekly"}
     ],
     "crypto": [
       {"symbol": "BTC", "amount": 100, "currency": "EUR", "frequency": "weekly"}

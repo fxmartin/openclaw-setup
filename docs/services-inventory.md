@@ -2,21 +2,43 @@
 
 Complete list of custom skills, configured tools, and automations running on Nyx.
 
-## Custom Skills
+## Custom Skills (13)
 
 Located in `~/clawd/skills/`
 
 | Skill | Description |
 |-------|-------------|
-| analyst-report | Executive analyst reports on companies |
-| banking-sector-report | Country banking sector deep-dives |
+| analyst-report | Executive analyst reports on companies (PDF) |
+| auto-updater | Daily auto-update for Openclaw and skills via cron |
+| banking-sector-report | Country banking sector deep-dives (PDF) |
 | crypto-market | Real-time crypto data + forecasts |
 | flight-tracker | Live flight tracking via OpenSky |
 | fx-daily-briefing | Personalized morning digest |
 | humanizer | Remove AI writing patterns |
+| linkedin-cli | LinkedIn CLI (`lk`) for feed, search, messages |
+| perplexity | AI-powered web search via Perplexity Pro API |
+| portfolio-watcher | Track stock/crypto holdings and alerts |
 | professional-profile | Research individuals' backgrounds |
-| weather | Weather forecasts (built-in) |
-| session-logs | Session logging and history (built-in) |
+| remind-me | Natural language reminders via cron |
+| skillcraft | Create and package Openclaw skills |
+
+## Bundled Skills (13)
+
+| Skill | Description |
+|-------|-------------|
+| clawdhub | Install/update skills from ClawdHub |
+| github | GitHub CLI (`gh`) integration |
+| gog | Google Workspace (Gmail, Calendar, Drive) |
+| himalaya | Email via IMAP/SMTP |
+| nano-banana-pro | Gemini image generation |
+| notion | Notion API integration |
+| openai-image-gen | OpenAI image generation |
+| openai-whisper-api | Audio transcription |
+| session-logs | Search session history |
+| slack | Slack integration |
+| tmux | Tmux session control |
+| video-frames | Extract video frames (ffmpeg) |
+| weather | Weather forecasts |
 
 ## Configured CLIs
 
@@ -40,7 +62,15 @@ Located in `~/clawd/skills/`
 | Hourly | Anthropic status check |
 | Periodic | YouTube monitors (IndyDevDan, Alex Ziskind) |
 | 1st & 15th monthly | Calendar sync reminder |
-| Dec 28 annually | Contrôle technique reminder |
+| Dec 28 annually | Controle technique reminder |
+
+## Backup Jobs
+
+| Schedule | Task | Script |
+|----------|------|--------|
+| Daily 3:00am | Dropbox sync (rclone) | `~/backup-to-dropbox.sh` |
+| Daily 3:30am | NAS rsync (Tailscale) | `~/backup-to-nas.sh` |
+| Sunday 4:00am | Security scan (rkhunter) | `~/security-scan.sh` |
 
 ## Monitoring Services
 
@@ -73,7 +103,8 @@ All monitoring accessible via Tailscale only (not exposed to public internet).
 
 ## Security
 
-- **sops + age** — Secrets encrypted at rest
-- **Dropbox backup** — Keys + encrypted configs
+- **sops + age** — Secrets encrypted at rest, decrypted to tmpfs (RAM only)
+- **Dropbox backup** — Encrypted configs backed up daily
+- **NAS backup** — Full state backed up via Tailscale
 
 See [sops-age-setup.md](sops-age-setup.md) for encryption details.
