@@ -76,6 +76,11 @@ Encrypted bundles (`*.tar.gz.age`) contain AGE keys, SOPS-encrypted configs, and
 ./scripts/restore-from-nas.sh --dry-run  # Preview first!
 ./scripts/restore-from-nas.sh --list     # List available backups
 ./scripts/restore-from-nas.sh            # Perform restore
+
+# Healthcheck (runs every 15min via cron with --fix)
+./scripts/healthcheck-openclaw.sh           # Check only
+./scripts/healthcheck-openclaw.sh --fix     # Check + auto-repair
+./scripts/healthcheck-openclaw.sh --quiet   # Exit code only
 ```
 
 ### Service Management (on Nyx)
@@ -146,6 +151,7 @@ scripts/            # Operational scripts
   security-scan.sh     # Weekly rkhunter scan (Sunday 4:00 AM)
   nix-update.sh        # Update Nix flake + rebuild
   nix-rollback.sh      # Rollback Nix generation
+  healthcheck-openclaw.sh # Gateway health + auto-repair (cron */15)
   sync-packages.sh     # Sync package manifest to server
   setup-nas-backup.sh  # NAS backup setup helper
   install-git-hooks.sh # One-time hook setup

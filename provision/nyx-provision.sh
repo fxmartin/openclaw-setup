@@ -1211,6 +1211,7 @@ setup_backups() {
     remote_copy "${REPO_DIR}/scripts/backup-to-nas.sh" "/tmp/nyx-setup/"
     remote_copy "${REPO_DIR}/scripts/restore-from-nas.sh" "/tmp/nyx-setup/"
     remote_copy "${REPO_DIR}/scripts/security-scan.sh" "/tmp/nyx-setup/"
+    remote_copy "${REPO_DIR}/scripts/healthcheck-openclaw.sh" "/tmp/nyx-setup/"
 
     remote_exec "bash -s" <<'SCRIPT'
 set -e
@@ -1252,6 +1253,14 @@ if [[ -f "/tmp/nyx-setup/restore-from-nas.sh" ]]; then
     echo "Installed: ${TARGET_HOME}/restore-from-nas.sh"
 fi
 
+# Install healthcheck script
+if [[ -f "/tmp/nyx-setup/healthcheck-openclaw.sh" ]]; then
+    cp "/tmp/nyx-setup/healthcheck-openclaw.sh" "${TARGET_HOME}/healthcheck-openclaw.sh"
+    chmod 755 "${TARGET_HOME}/healthcheck-openclaw.sh"
+    chown "${TARGET_USER}:${TARGET_USER}" "${TARGET_HOME}/healthcheck-openclaw.sh"
+    echo "Installed: ${TARGET_HOME}/healthcheck-openclaw.sh"
+fi
+
 echo "==> Checking prerequisites..."
 # Check rsync password file for NAS backup
 if [[ ! -f "${TARGET_HOME}/.rsync-nas-password" ]]; then
@@ -1288,6 +1297,14 @@ if ! echo "$existing_cron" | grep -q "security-scan.sh"; then
     echo "Adding: 0 4 * * 0 ${TARGET_HOME}/security-scan.sh"
 else
     echo "Security scan cron already exists"
+fi
+
+# Add openclaw healthcheck (every 15 minutes, auto-fix on failure)
+if ! echo "$existing_cron" | grep -q "healthcheck-openclaw.sh"; then
+    new_cron=$(echo "$new_cron"; echo "*/15 * * * * ${TARGET_HOME}/healthcheck-openclaw.sh --fix")
+    echo "Adding: */15 * * * * ${TARGET_HOME}/healthcheck-openclaw.sh --fix"
+else
+    echo "Healthcheck cron already exists"
 fi
 
 # Apply new crontab (filter out blank lines)
