@@ -1,7 +1,7 @@
 # Nyx Server Setup
 
 > Self-documented server configuration for the Nyx OpenClaw instance.
-> Last updated: 2026-01-31
+> Last updated: 2026-03-09
 
 ## Server Specifications
 
@@ -37,12 +37,31 @@
 - Sunday 4:00am: Security scan
 
 ## OpenClaw
-- Telegram channel enabled
+- Version: 2026.3.7
+- Telegram channel enabled (@NyxFXBot)
+- Source: ~/openclaw-git/ (npm linked globally via `npm install -g .`)
 - Workspace: ~/clawd/
 - Config: ~/.openclaw/
-- Service: `openclaw.service` (systemd)
-- Gateway mode: foreground (`gateway run`)
+- Service: `openclaw.service` (systemd, `User=fx`)
+- Gateway mode: foreground (`gateway run --force`)
 - Auth: `gateway.auth.token` configured
+- Upgrade: `./scripts/upgrade-openclaw.sh --tag <version>` (from local machine)
+
+### Service Architecture
+- `Type=oneshot` + `RemainAfterExit=yes` — gateway forks a detached child and parent exits
+- `SuccessExitStatus=1` — parent exits with code 1 (expected, not a failure)
+- `ExecStartPre=+openclaw-start.sh` runs as root to decrypt secrets to tmpfs
+- Second `ExecStartPre` kills orphaned gateway processes from previous runs
+- `ExecStart=openclaw gateway run --force` runs as `User=fx`
+- `ExecStop`/`ExecStopPost` kills detached gateway child via `pgrep -x openclaw-gatewa`
+- `ReadWritePaths` includes ~/openclaw-git for runtime writes
+
+### Upgrade Notes
+- Built-in `openclaw update` fails due to `ProtectHome=read-only`
+- Use `./scripts/upgrade-openclaw.sh` instead (runs via SSH, outside systemd)
+- After checkout, `npm run build` is required to regenerate `dist/plugin-sdk/`
+- Build requires `pnpm` (installed globally if missing)
+- Always prefer tagged releases; verify changelog before major jumps
 
 ## Monitoring Stack
 - Beszel Hub: `beszel-hub.service` (user) — port 8090, resource dashboards

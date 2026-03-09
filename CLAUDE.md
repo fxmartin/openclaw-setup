@@ -83,6 +83,19 @@ Encrypted bundles (`*.tar.gz.age`) contain AGE keys, SOPS-encrypted configs, and
 ./scripts/healthcheck-openclaw.sh --quiet   # Exit code only
 ```
 
+### OpenClaw Upgrade
+
+```bash
+# Check available versions (dry-run)
+./scripts/upgrade-openclaw.sh --dry-run
+
+# Upgrade to specific release tag (recommended)
+./scripts/upgrade-openclaw.sh --tag v2026.3.7
+
+# Upgrade to latest main (bleeding edge)
+./scripts/upgrade-openclaw.sh
+```
+
 ### Service Management (on Nyx)
 
 ```bash
@@ -133,9 +146,9 @@ mission-control/    # Next.js dashboard app (Activity, Calendar, Search)
   DOCUMENTATION.md     # Dashboard design documentation
 
 config/             # Systemd & decryption configuration
-  openclaw.service     # Main service unit
+  openclaw.service     # Main service unit (Type=oneshot, RemainAfterExit)
   openclaw-runtime.mount # tmpfs mount unit
-  openclaw-start.sh    # Startup: decrypt + symlink + start
+  openclaw-start.sh    # Startup: decrypt secrets to tmpfs (ExecStartPre)
   openclaw-decrypt.sh  # Decrypt wrapper (calls sudo)
   sops-decrypt-config  # SOPS decrypt helper
   mission-control.service # Dashboard systemd user service
@@ -156,6 +169,8 @@ scripts/            # Operational scripts
   setup-nas-backup.sh  # NAS backup setup helper
   install-git-hooks.sh # One-time hook setup
   install-monitoring.sh # Beszel + Uptime Kuma installer
+  healthcheck-openclaw.sh # Gateway healthcheck + auto-repair (cron, every 15 min)
+  upgrade-openclaw.sh  # Remote OpenClaw upgrade via SSH (stops, rebuilds, restarts)
   mc-log.sh            # Mission Control activity logger
   mc-refresh-cron.sh   # Mission Control cron data refresh
 
@@ -178,6 +193,7 @@ tests/              # Integration tests
 
 ### Paths on Nyx Server
 
+- OpenClaw source: `~/openclaw-git/` (npm linked globally)
 - Installation: `~/clawd/`
 - Encrypted config: `~/.openclaw/openclaw.json.enc`
 - Runtime secrets: `~/.openclaw/runtime/` (tmpfs)

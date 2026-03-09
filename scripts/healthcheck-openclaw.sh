@@ -1,5 +1,6 @@
 #!/bin/bash
-# healthcheck-openclaw.sh - Verify openclaw gateway is healthy
+# ABOUTME: Healthcheck for openclaw gateway with auto-repair capability.
+# ABOUTME: Runs via cron every 15 min; checks service, node_modules, and gateway process.
 #
 # Checks:
 #   1. openclaw systemd service is active (not crash-looping)
@@ -135,18 +136,27 @@ check_gateway_process() {
 # ============================================
 
 attempt_fix() {
-    log "Attempting auto-repair: npm install in $OPENCLAW_DIR"
+    log "Attempting auto-repair: stopping service, reinstalling node_modules"
+
+    # Stop the service first to prevent the race condition where systemd's
+    # restart loop reads from node_modules while npm install is writing to it.
+    log "Stopping openclaw service before npm install"
+    sudo systemctl stop openclaw
+
     cd "$OPENCLAW_DIR"
 
-    if rm -rf node_modules && npm install --silent 2>&1 | tail -3 | tee -a "$LOG_FILE"; then
-        log "npm install succeeded, restarting openclaw service"
-        sudo systemctl restart openclaw
+    if rm -rf node_modules && npm install 2>&1 | tail -5 | tee -a "$LOG_FILE"; then
+        log "npm install succeeded, starting openclaw service"
+        sudo systemctl start openclaw
         sleep 5
 
         if check_service_active && check_gateway_process; then
             log "Auto-repair successful"
             return 0
         fi
+    else
+        log "npm install failed, starting openclaw service anyway"
+        sudo systemctl start openclaw
     fi
 
     log "Auto-repair failed"
