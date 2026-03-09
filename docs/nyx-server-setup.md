@@ -48,13 +48,15 @@
 - Upgrade: `./scripts/upgrade-openclaw.sh --tag <version>` (from local machine)
 
 ### Service Architecture
-- `Type=oneshot` + `RemainAfterExit=yes` — gateway forks a detached child and parent exits
-- `SuccessExitStatus=1` — parent exits with code 1 (expected, not a failure)
+- `Type=simple` with `User=fx` — gateway runs in true foreground
+- `OPENCLAW_NO_RESPAWN=1` prevents the gateway from forking a detached child
 - `ExecStartPre=+openclaw-start.sh` runs as root to decrypt secrets to tmpfs
-- Second `ExecStartPre` kills orphaned gateway processes from previous runs
-- `ExecStart=openclaw gateway run --force` runs as `User=fx`
-- `ExecStop`/`ExecStopPost` kills detached gateway child via `pgrep -x openclaw-gatewa`
+- `ExecStart=openclaw gateway run` runs as `User=fx`
+- `Restart=on-failure` with `RestartSec=10` for resilience
 - `ReadWritePaths` includes ~/openclaw-git for runtime writes
+- IMPORTANT: The old user-level service (`systemctl --user openclaw-gateway`)
+  must be disabled — it was installed by `openclaw gateway install` and competes
+  for port 18789, causing restart loops
 
 ### Upgrade Notes
 - Built-in `openclaw update` fails due to `ProtectHome=read-only`

@@ -6,15 +6,12 @@
 #   - /usr/local/bin/openclaw-start.sh (decrypt and start wrapper)
 #
 # Architecture:
-#   `openclaw gateway run` spawns a detached openclaw-gateway child process
-#   and the parent exits — this is normal OpenClaw behavior on Linux with
-#   systemd detected. Type=oneshot + RemainAfterExit tells systemd to expect
-#   the parent to exit and keeps the service marked as "active".
+#   ExecStartPre (root): decrypts secrets to tmpfs.
+#   ExecStart (fx): runs gateway in foreground with OPENCLAW_NO_RESPAWN=1
+#   to prevent the default detached-fork behavior.
 #
-#   ExecStartPre kills orphaned gateway processes from previous runs.
-#   ExecStop/ExecStopPost kills the detached child(ren) on service stop.
-#   The healthcheck cron (every 15 min) monitors the gateway child process
-#   and can trigger auto-repair if it crashes.
+# IMPORTANT: The old user-level service (systemctl --user openclaw-gateway)
+#   must be disabled. Two services on port 18789 causes restart loops.
 #
 # Usage:
 #   sudo systemctl enable openclaw
@@ -27,16 +24,11 @@ After=network.target home-fx-.openclaw-runtime.mount
 Requires=home-fx-.openclaw-runtime.mount
 
 [Service]
-Type=oneshot
-RemainAfterExit=yes
+Type=simple
 # Phase 1 (root): decrypt secrets to tmpfs
 ExecStartPre=+/usr/local/bin/openclaw-start.sh
-# Phase 2 (root): kill any orphaned gateway processes from previous runs
-ExecStartPre=+/bin/bash -c 'pgrep -x "openclaw-gatewa" | xargs -r kill -9 || true; sleep 1'
-# Phase 3 (fx): start gateway (spawns detached child, parent exits)
-ExecStart=/home/fx/.local/share/npm-global/bin/openclaw gateway run --force
-ExecStop=+/bin/bash -c 'pgrep -x "openclaw-gatewa" | xargs -r kill || true'
-ExecStopPost=+/bin/bash -c 'sleep 1; pgrep -x "openclaw-gatewa" | xargs -r kill -9 || true'
+# Phase 2 (fx): start gateway in foreground
+ExecStart=/home/fx/.local/share/npm-global/bin/openclaw gateway run
 User=fx
 Group=fx
 WorkingDirectory=/home/fx/clawd
@@ -45,10 +37,12 @@ Environment="PATH=/home/fx/.nix-profile/bin:/home/fx/.local/share/npm-global/bin
 Environment="XDG_RUNTIME_DIR=/run/user/1000"
 Environment="DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus"
 Environment="OPENCLAW_GATEWAY_TOKEN=local-gateway-token"
-# Parent spawns detached child and exits with code 1 (port conflict with its
-# own child). SuccessExitStatus=1 tells systemd this is expected behavior.
-SuccessExitStatus=1
-TimeoutStartSec=60
+# Prevent gateway from forking a detached child; run in true foreground
+Environment="OPENCLAW_NO_RESPAWN=1"
+Restart=on-failure
+RestartSec=10
+KillMode=control-group
+KillSignal=SIGTERM
 TimeoutStopSec=15
 # Security hardening
 ProtectSystem=strict
